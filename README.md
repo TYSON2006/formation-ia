@@ -15,6 +15,24 @@ ordinateur ; aucune clé API Mistral n'est nécessaire.
    cet historique.
 
 Les passages gardent le nom du PDF et le numéro de page pour afficher les sources.
+Les PDF de formation ne sont pas publiés dans ce dépôt ; chacun peut ajouter ses
+propres documents dans `documents/`.
+
+## Installer le projet après l'avoir cloné
+
+Dans PowerShell, clone le dépôt, crée un environnement Python et installe les
+dépendances :
+
+```powershell
+git clone https://github.com/TYSON2006/formation-ia.git
+cd formation-ia
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+Chaque personne doit avoir Python et Ollama installés sur son ordinateur. Le
+fichier `.env` est local et ne doit pas être envoyé sur GitHub.
 
 ## Préparation
 
