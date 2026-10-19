@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f7fb">
+    <title>Assistant documentaire</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Assistant documentaire, accueil">
+          <span class="brand-mark" aria-hidden="true">✳</span>
+          <span class="brand-name">Mon assistant <span>IA</span></span>
+        </a>
+
+        <div class="topbar-actions">
+          <div class="connection-state" role="status" aria-live="polite">
+            <span class="connection-dot" aria-hidden="true"></span>
+            <span id="status-text">Prêt à discuter</span>
+          </div>
+          <button class="new-chat-button" id="new-chat" type="button">
+            <span aria-hidden="true">＋</span>
+            Nouvelle discussion
+          </button>
+        </div>
+      </header>
+
+      <main class="chat-layout">
+        <section class="chat-panel" aria-label="Discussion avec l'assistant documentaire">
+          <div class="chat-heading">
+            <div class="heading-icon" aria-hidden="true">✦</div>
+            <div>
+              <p class="eyebrow">TON ASSISTANT DOCUMENTAIRE</p>
+              <h1>On parle de tes documents.</h1>
+              <p class="heading-description">Pose une question. Je chercherai la réponse dans tes PDF et j’indiquerai les pages utilisées.</p>
+            </div>
+          </div>
+
+          <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text">
+            <div class="welcome-card" id="welcome">
+              <p class="welcome-title">Par quoi veux-tu commencer ?</p>
+              <p class="welcome-description">Choisis une question ou écris la tienne dans la zone de saisie.</p>
+              <div class="suggestions">
+                <button class="suggestion" type="button" data-question="Qu'est-ce qu'un token dans un modèle de langage ?">
+                  <span aria-hidden="true">⌕</span>
+                  Qu’est-ce qu’un token ?
+                  <span class="suggestion-arrow" aria-hidden="true">↗</span>
+                </button>
+                <button class="suggestion" type="button" data-question="Comment fonctionne un modèle de langage ?">
+                  <span aria-hidden="true">⌕</span>
+                  Comment fonctionne un LLM ?
+                  <span class="suggestion-arrow" aria-hidden="true">↗</span>
+                </button>
+                <button class="suggestion" type="button" data-question="Peux-tu résumer les notions importantes de mes documents ?">
+                  <span aria-hidden="true">⌕</span>
+                  Résume les notions importantes
+                  <span class="suggestion-arrow" aria-hidden="true">↗</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer-area">
+            <form class="composer" id="chat-form">
+              <label class="visually-hidden" for="question">Écris ta question</label>
+              <textarea id="question" name="question" rows="1" maxlength="1000" placeholder="Pose une question sur tes documents…" required></textarea>
+              <button class="send-button" id="send-button" type="submit" aria-label="Envoyer la question" disabled>
+                <span aria-hidden="true">↑</span>
+              </button>
+            </form>
+            <p class="composer-hint"><kbd>Entrée</kbd> pour envoyer <span>·</span> <kbd>Maj + Entrée</kbd> pour aller à la ligne</p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="page-footer">
+        <span class="footer-lock" aria-hidden="true">⌂</span>
+        Réponses générées en local avec Ollama
+      </footer>
+    </div>
+  </body>
+</html>

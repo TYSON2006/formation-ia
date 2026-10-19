@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+index/
+# Les PDF de formation restent locaux et ne sont pas envoyés sur GitHub.
+documents/*.pdf
+documents/**/*.pdf
