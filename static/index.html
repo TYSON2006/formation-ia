@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f6f7fb">
-    <title>Assistant documentaire</title>
+    <title>Tuteur pédagogique IA</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/app.js" defer></script>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="Assistant documentaire, accueil">
+        <a class="brand" href="/" aria-label="Tuteur pédagogique IA, accueil">
           <span class="brand-mark" aria-hidden="true">✳</span>
           <span class="brand-name">Mon assistant <span>IA</span></span>
         </a>
@@ -29,20 +29,20 @@
       </header>
 
       <main class="chat-layout">
-        <section class="chat-panel" aria-label="Discussion avec l'assistant documentaire">
+        <section class="chat-panel" aria-label="Discussion avec le tuteur pédagogique">
           <div class="chat-heading">
             <div class="heading-icon" aria-hidden="true">✦</div>
             <div>
-              <p class="eyebrow">TON ASSISTANT DOCUMENTAIRE</p>
-              <h1>On parle de tes documents.</h1>
-              <p class="heading-description">Pose une question. Je chercherai la réponse dans tes PDF et j’indiquerai les pages utilisées.</p>
+              <p class="eyebrow">TON TUTEUR PÉDAGOGIQUE</p>
+              <h1>Comprenons tes cours ensemble.</h1>
+              <p class="heading-description">Pose une question sur tes supports. Je t’expliquerai la notion simplement et j’indiquerai les pages utilisées.</p>
             </div>
           </div>
 
           <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="welcome-card" id="welcome">
               <p class="welcome-title">Par quoi veux-tu commencer ?</p>
-              <p class="welcome-description">Choisis une question ou écris la tienne dans la zone de saisie.</p>
+              <p class="welcome-description">Choisis une question ou demande une explication sur tes supports de cours.</p>
               <div class="suggestions">
                 <button class="suggestion" type="button" data-question="Qu'est-ce qu'un token dans un modèle de langage ?">
                   <span aria-hidden="true">⌕</span>
@@ -71,7 +71,7 @@
                 <span aria-hidden="true">＋</span>
                 <span>PDF</span>
               </button>
-              <textarea id="question" name="question" rows="1" maxlength="1000" placeholder="Pose une question sur tes documents…" required></textarea>
+              <textarea id="question" name="question" rows="1" maxlength="1000" placeholder="Qu’aimerais-tu comprendre dans ton cours ?" required></textarea>
               <button class="send-button" id="send-button" type="submit" aria-label="Envoyer la question" disabled>
                 <span aria-hidden="true">↑</span>
               </button>

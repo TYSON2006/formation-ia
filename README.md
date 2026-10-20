@@ -1,7 +1,20 @@
-# Chatbot documentaire (Ollama + RAG)
+# Tuteur pédagogique IA (Ollama + RAG)
 
 Cette version utilise Ollama en local. Les réponses sont générées sur ton
 ordinateur ; aucune clé API Mistral n'est nécessaire.
+
+## Objectif pédagogique
+
+Le projet est un tuteur qui aide les apprenants, notamment les débutants, à
+comprendre leurs supports de cours. Il explique avec des mots simples, peut donner
+un exemple lorsque les PDF le permettent et indique les pages qui justifient sa
+réponse. Il reconnaît aussi quand les supports indexés ne contiennent pas la
+réponse.
+
+Le tuteur n'a pas été réentraîné sur un domaine. Avec le RAG, son sujet dépend des
+PDF ajoutés : le cours de départ porte sur l'IA pour développeurs. Pour le
+spécialiser dans une autre matière, ajoute des supports de cours de cette matière
+et des questions de référence pour évaluer ses réponses.
 
 ## Fonctionnement
 
@@ -47,6 +60,9 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
 - `rag.py` : ajout de durées dans le terminal du serveur pour distinguer le temps
   de recherche documentaire du temps de génération par Ollama, et d'un cache local
   qui peut réutiliser les réponses identiques sans rappeler le modèle.
+- `rag.py`, `static/index.html` et `static/app.js` : positionnement du chatbot comme
+  tuteur pédagogique pour apprenants ; le prompt demande des explications simples,
+  des exemples tirés des supports et des sources vérifiables.
 - `llm.py` et `.env.example` : modèle conservé en mémoire plus longtemps et limite
   de génération réduite pour obtenir des réponses plus courtes.
 - `requirements.txt` : ajout de `python-multipart`, utilisé par FastAPI pour

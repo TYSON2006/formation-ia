@@ -17,7 +17,7 @@ from pypdf.errors import PdfReadError
 from rag import DOSSIER_DOCUMENTS, indexer_pdf, repondre
 
 
-app = FastAPI(title="Chatbot documentaire", version="0.1.0")
+app = FastAPI(title="Tuteur pédagogique IA", version="0.1.0")
 DOSSIER = Path(__file__).resolve().parent
 TAILLE_MAX_PDF = 20 * 1024 * 1024
 app.mount("/static", StaticFiles(directory=DOSSIER / "static"), name="static")

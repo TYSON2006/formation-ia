@@ -41,7 +41,7 @@ function ajouterMessage(role, texte, sources = [], options = {}) {
 
   const meta = document.createElement("div");
   meta.className = "message-meta";
-  meta.textContent = role === "user" ? "Toi" : "Assistant documentaire";
+  meta.textContent = role === "user" ? "Toi" : "Tuteur pédagogique";
 
   const content = document.createElement("div");
   content.className = "message-content";
@@ -94,7 +94,7 @@ async function envoyerQuestion(question) {
   requestEnCours = true;
   newChatButton.disabled = true;
   mettreAJourBoutons();
-  afficherStatut("Recherche dans les documents…", "loading");
+  afficherStatut("Recherche dans tes supports de cours…", "loading");
   const messageAttente = ajouterMessage("assistant", "", [], { loading: true });
 
   try {
