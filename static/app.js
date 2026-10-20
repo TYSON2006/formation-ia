@@ -1,6 +1,8 @@
 const form = document.querySelector("#chat-form");
 const questionField = document.querySelector("#question");
 const sendButton = document.querySelector("#send-button");
+const uploadButton = document.querySelector("#upload-button");
+const pdfInput = document.querySelector("#pdf-file");
 const newChatButton = document.querySelector("#new-chat");
 const messages = document.querySelector("#messages");
 const welcome = document.querySelector("#welcome");
@@ -12,6 +14,7 @@ let requestEnCours = false;
 
 function mettreAJourBoutons() {
   sendButton.disabled = requestEnCours || !questionField.value.trim();
+  uploadButton.disabled = requestEnCours;
 }
 
 function afficherStatut(texte, etat = "") {
@@ -128,9 +131,58 @@ async function envoyerQuestion(question) {
   }
 }
 
+async function importerPDF(fichier) {
+  if (!fichier || requestEnCours) return;
+
+  welcome?.remove();
+  requestEnCours = true;
+  newChatButton.disabled = true;
+  mettreAJourBoutons();
+  afficherStatut(`Indexation de ${fichier.name}…`, "loading");
+
+  const donnees = new FormData();
+  donnees.append("fichier", fichier);
+
+  try {
+    const response = await fetch("/documents", { method: "POST", body: donnees });
+    const resultat = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = typeof resultat.detail === "string"
+        ? resultat.detail
+        : "Le serveur n'a pas pu ajouter ce PDF.";
+      throw new Error(detail);
+    }
+
+    const resume = resultat.chunks > 0
+      ? `Document ajouté : ${resultat.source}\n${resultat.pages} page(s), ${resultat.chunks} passage(s) indexé(s). Tu peux maintenant poser une question dessus.`
+      : `Document ajouté : ${resultat.source}\nAucun texte sélectionnable n'a été trouvé. Ce PDF est peut-être scanné.`;
+    ajouterMessage("assistant", resume);
+    afficherStatut("Document prêt");
+  } catch (erreur) {
+    const detail = erreur instanceof TypeError
+      ? "Impossible de joindre le serveur. Vérifie que FastAPI est démarré dans le terminal."
+      : erreur.message;
+    ajouterMessage("assistant", detail, [], { error: true });
+    afficherStatut("Le PDF n’a pas pu être ajouté", "error");
+  } finally {
+    requestEnCours = false;
+    newChatButton.disabled = false;
+    pdfInput.value = "";
+    mettreAJourBoutons();
+    questionField.focus();
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   envoyerQuestion(questionField.value);
+});
+
+uploadButton.addEventListener("click", () => pdfInput.click());
+
+pdfInput.addEventListener("change", () => {
+  const fichier = pdfInput.files?.[0];
+  importerPDF(fichier);
 });
 
 questionField.addEventListener("input", () => {

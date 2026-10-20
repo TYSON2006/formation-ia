@@ -66,12 +66,17 @@
           <div class="composer-area">
             <form class="composer" id="chat-form">
               <label class="visually-hidden" for="question">Écris ta question</label>
+              <input class="visually-hidden" id="pdf-file" name="fichier" type="file" accept="application/pdf,.pdf">
+              <button class="upload-button" id="upload-button" type="button" aria-label="Ajouter un PDF" title="Ajouter un PDF">
+                <span aria-hidden="true">＋</span>
+                <span>PDF</span>
+              </button>
               <textarea id="question" name="question" rows="1" maxlength="1000" placeholder="Pose une question sur tes documents…" required></textarea>
               <button class="send-button" id="send-button" type="submit" aria-label="Envoyer la question" disabled>
                 <span aria-hidden="true">↑</span>
               </button>
             </form>
-            <p class="composer-hint"><kbd>Entrée</kbd> pour envoyer <span>·</span> <kbd>Maj + Entrée</kbd> pour aller à la ligne</p>
+            <p class="composer-hint">Les PDF ajoutés restent sur ton ordinateur <span>·</span> <kbd>Entrée</kbd> pour envoyer <span>·</span> <kbd>Maj + Entrée</kbd> pour une nouvelle ligne</p>
           </div>
         </section>
       </main>

@@ -15,9 +15,9 @@ load_dotenv(DOSSIER_PROJET / ".env")
 URL = os.getenv("LLM_URL", "http://127.0.0.1:11434/api/chat")
 MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 TIMEOUT = float(os.getenv("LLM_TIMEOUT", "180"))
-KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "10m")
+KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
-NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "256"))
+NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "160"))
 
 
 def appeler_llm(system: str, user: str, temperature: float = 0.2) -> dict[str, Any]:

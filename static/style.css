@@ -120,8 +120,12 @@ h1 { margin: 0; font-family: "Segoe UI", Arial, sans-serif; font-size: clamp(19p
 .composer-area { padding: 15px 25px 12px; border-top: 1px solid #f0f0f5; background: rgba(255, 255, 255, .96); }
 .composer { display: flex; align-items: flex-end; gap: 10px; min-height: 53px; padding: 7px 8px 7px 15px; border: 1px solid #e6e6ee; border-radius: 13px; background: #fff; box-shadow: 0 3px 11px rgba(47, 46, 80, .035); transition: border-color .18s, box-shadow .18s; }
 .composer:focus-within { border-color: #b9b2f3; box-shadow: 0 0 0 3px rgba(101, 87, 217, .08); }
-.composer textarea { width: 100%; min-height: 35px; max-height: 130px; resize: none; padding: 9px 0 5px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; line-height: 1.6; }
+.composer textarea { width: 100%; min-width: 0; min-height: 35px; max-height: 130px; flex: 1; resize: none; padding: 9px 0 5px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .composer textarea::placeholder { color: #a1a2b0; }
+.upload-button { display: flex; min-width: 55px; height: 36px; flex: 0 0 auto; align-items: center; justify-content: center; gap: 3px; padding: 0 8px; border: 1px solid #e7e5f5; border-radius: 10px; background: #faf9ff; color: #6557c9; cursor: pointer; font-size: 10px; font-weight: 700; transition: border-color .18s, background .18s, opacity .18s; }
+.upload-button > span:first-child { font-size: 16px; font-weight: 400; line-height: 1; }
+.upload-button:hover:not(:disabled) { border-color: #c9c3f3; background: #f3f1ff; }
+.upload-button:disabled { cursor: wait; opacity: .45; }
 .send-button { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 10px; background: var(--purple); color: white; cursor: pointer; font-size: 22px; line-height: 1; transition: background .18s, transform .18s, opacity .18s; }
 .send-button:hover:not(:disabled) { transform: translateY(-1px); background: var(--purple-dark); }
 .send-button:disabled { cursor: not-allowed; opacity: .4; }

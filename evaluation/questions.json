@@ -1,0 +1,78 @@
+{
+  "description": "Questions de référence pour mesurer les passages retrouvés dans le cours Comprendre l'IA pour développeurs.",
+  "source_contains": "Comprendre l'IA pour développeurs.pdf",
+  "questions": [
+    {
+      "id": "IA-01",
+      "question": "Quelle est la différence entre l'entraînement et l'inférence d'un modèle ?",
+      "reponse_attendue": "L'entraînement ajuste le modèle à partir d'exemples. L'inférence consiste à utiliser le modèle entraîné sur un nouveau cas.",
+      "pages_attendues": [2]
+    },
+    {
+      "id": "IA-02",
+      "question": "Que font respectivement la classification, la régression et la génération ?",
+      "reponse_attendue": "La classification choisit une catégorie, la régression prédit une valeur numérique et la génération produit du texte, une image ou du code.",
+      "pages_attendues": [2]
+    },
+    {
+      "id": "IA-03",
+      "question": "Qu'est-ce qu'un token et quel ordre de grandeur le cours donne-t-il pour le français ?",
+      "reponse_attendue": "Un token est un morceau de mot. Le cours propose de compter environ 1,5 token par mot français.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-04",
+      "question": "Que désigne la fenêtre de contexte d'un modèle ?",
+      "reponse_attendue": "C'est le nombre maximal de tokens que le modèle peut lire en un seul appel.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-05",
+      "question": "À quoi sert un embedding et quel exemple illustre deux idées proches ?",
+      "reponse_attendue": "Un embedding représente le sens d'un texte par des nombres. Des phrases comme résilier un abonnement et annuler un contrat peuvent avoir des représentations proches.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-06",
+      "question": "Quelles sont les étapes principales du RAG décrites dans le cours ?",
+      "reponse_attendue": "Le système retrouve les passages des documents liés à la question grâce aux embeddings, puis les fournit au modèle dans son prompt.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-07",
+      "question": "Quelle différence y a-t-il entre le RAG et le fine-tuning ?",
+      "reponse_attendue": "Le RAG retrouve des passages dans des documents et les donne au modèle. Le fine-tuning réentraîne un modèle existant sur des exemples.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-08",
+      "question": "Dans quel cas le cours recommande-t-il d'utiliser un LLM avec du RAG ?",
+      "reponse_attendue": "Quand le modèle doit s'appuyer sur des informations privées ou récentes, par exemple le règlement intérieur d'une école.",
+      "pages_attendues": [4]
+    },
+    {
+      "id": "IA-09",
+      "question": "Qu'est-ce qu'une hallucination et quelle précaution faut-il prendre ?",
+      "reponse_attendue": "C'est une réponse fausse mais formulée avec assurance. Il faut vérifier ce que le modèle renvoie.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-10",
+      "question": "Quelles sont les cinq règles du cours pour écrire un bon prompt ?",
+      "reponse_attendue": "Donner un rôle et un contexte, préciser le format, montrer des exemples si nécessaire, séparer les données des instructions et demander une analyse avant la conclusion pour une tâche complexe.",
+      "pages_attendues": [8, 9]
+    },
+    {
+      "id": "IA-11",
+      "question": "Comment la température influence-t-elle la réponse d'un LLM selon le cours ?",
+      "reponse_attendue": "À 0, les réponses sont plus stables. Une température plus élevée, jusqu'à 1, rend les réponses plus variées mais moins fiables.",
+      "pages_attendues": [3]
+    },
+    {
+      "id": "IA-12",
+      "question": "Quelle approche choisir pour vérifier le format d'un numéro de téléphone ?",
+      "reponse_attendue": "Une règle simple, comme une expression régulière, suffit : ce problème ne nécessite pas d'IA.",
+      "pages_attendues": [4]
+    }
+  ]
+}

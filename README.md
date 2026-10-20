@@ -9,7 +9,7 @@ ordinateur ; aucune clé API Mistral n'est nécessaire.
    dans `index/` avec ChromaDB.
 2. À chaque question, ChromaDB retrouve des passages pertinents.
 3. `llm.py` envoie les passages à Ollama et valide la réponse JSON.
-4. `main.py` expose l'API `POST /ask` et sert l'interface web du chat.
+4. `main.py` expose l'API `POST /ask`, reçoit les PDF sur `POST /documents` et sert l'interface web du chat.
 5. L'interface garde les six derniers messages de la discussion pour aider à
    comprendre les questions de suivi. Le bouton « Nouvelle discussion » efface
    cet historique.
@@ -17,6 +17,55 @@ ordinateur ; aucune clé API Mistral n'est nécessaire.
 Les passages gardent le nom du PDF et le numéro de page pour afficher les sources.
 Les PDF de formation ne sont pas publiés dans ce dépôt ; chacun peut ajouter ses
 propres documents dans `documents/`.
+
+## Organisation des fichiers
+
+| Fichier ou dossier | Rôle dans le projet |
+| --- | --- |
+| `main.py` | API FastAPI et interface web : `POST /ask` répond aux questions, `POST /documents` reçoit un PDF (20 Mo maximum), détecte les copies exactes et l'indexe. |
+| `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, le stocke dans ChromaDB, retrouve les passages, prépare les sources et gère le cache des réponses. |
+| `llm.py` | Envoie les passages à Ollama, demande une réponse JSON concise et vérifie que le JSON reçu est valide. |
+| `static/index.html` | Structure de la page du chat, de la zone de saisie et du bouton d'ajout PDF. |
+| `static/style.css` | Apparence de l'interface et adaptation aux petits écrans. |
+| `static/app.js` | Envoi des questions, historique de discussion, ajout de PDF et affichage des réponses, erreurs et sources. |
+| `documents/` | PDF locaux à indexer. Les fichiers PDF sont ignorés par Git et ne sont donc pas publiés. |
+| `index/` | Base ChromaDB et cache SQLite des réponses créés localement ; ils sont régénérables et ignorés par Git. |
+| `evaluation/questions.json` | Questions de référence, réponses attendues et pages à retrouver dans le cours d'introduction à l'IA. |
+| `evaluer_rag.py` | Mesure si les bonnes pages sont retrouvées avec `k = 1, 2, 4, 6`. Le script n'appelle pas Ollama. |
+| `requirements.txt` | Dépendances Python nécessaires au projet. |
+| `.env.example` | Exemple de réglages locaux pour Ollama ; à copier vers `.env`. |
+| `.env` | Réglages privés de ta machine. Ce fichier est ignoré par Git. |
+| `.gitignore` | Empêche l'envoi de `.env`, des environnements Python, de l'index et des PDF locaux. |
+
+### Modifications récentes
+
+Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étapes :
+
+- `main.py` : ajout de `POST /documents`. Cette route accepte un PDF, vérifie son
+  extension et son contenu, limite sa taille à 20 Mo, refuse une copie exacte déjà
+  importée et ajoute un suffixe si un PDF différent porte le même nom.
+- `rag.py` : ajout de durées dans le terminal du serveur pour distinguer le temps
+  de recherche documentaire du temps de génération par Ollama, et d'un cache local
+  qui peut réutiliser les réponses identiques sans rappeler le modèle.
+- `llm.py` et `.env.example` : modèle conservé en mémoire plus longtemps et limite
+  de génération réduite pour obtenir des réponses plus courtes.
+- `requirements.txt` : ajout de `python-multipart`, utilisé par FastAPI pour
+  recevoir le fichier envoyé par le navigateur.
+- `static/index.html` : ajout du bouton `+ PDF` et du sélecteur de fichier dans
+  la zone de saisie.
+- `static/app.js` : envoi du PDF à l'API, désactivation temporaire des actions
+  pendant l'indexation, et affichage du résultat ou d'une erreur dans le chat.
+- `static/style.css` : style du bouton PDF et ajustement de la zone de saisie.
+- `evaluer_rag.py` : nouveau script de mesure qui compare la recherche à
+  `k = 1, 2, 4, 6` sans démarrer Ollama.
+- `evaluation/questions.json` : nouveau jeu de 12 questions, avec réponses de
+  référence et pages utiles du cours.
+- `README.md` : ajout de cet inventaire et des instructions d'indexation et
+  d'évaluation.
+
+`llm.py` appelle toujours Ollama et valide le JSON reçu. Les durées affichées par
+`rag.py` permettent de voir si l'attente vient surtout de la recherche ou de la
+génération locale.
 
 ## Installer le projet après l'avoir cloné
 
@@ -57,20 +106,28 @@ Le fichier `.env` contient les réglages locaux :
 LLM_URL=http://127.0.0.1:11434/api/chat
 LLM_MODEL=llama3.2:3b
 LLM_TIMEOUT=180
-OLLAMA_KEEP_ALIVE=10m
+OLLAMA_KEEP_ALIVE=30m
 OLLAMA_NUM_CTX=4096
-OLLAMA_NUM_PREDICT=256
+OLLAMA_NUM_PREDICT=160
 HF_HUB_OFFLINE=1
 ```
 
-Ollama garde le modèle chargé pendant dix minutes après une réponse. La toute
-première réponse après démarrage peut être plus lente, le temps de charger le
-modèle. La taille de réponse est limitée à 256 tokens pour éviter les générations
-trop longues.
+Ollama garde le modèle chargé pendant 30 minutes après une réponse. Cela peut
+accélérer la première question après une courte pause, en utilisant la mémoire de
+l'ordinateur pendant ce temps. La génération est limitée à 160 tokens et les
+réponses demandées sont courtes.
 
 ## Indexer les documents
 
-À chaque ajout ou modification d'un PDF, lance depuis ce dossier :
+Tu peux ajouter un PDF directement dans l'interface avec le bouton « + PDF » près
+de la zone de saisie. Le fichier est enregistré dans `documents/` puis indexé
+automatiquement. La limite est de 20 Mo par fichier. Plusieurs PDF peuvent porter
+le même nom : si leur contenu diffère, l'application ajoute un suffixe
+(`Document (2).pdf`). Une copie exacte déjà importée est refusée et indique le nom
+du fichier existant.
+
+L'autre méthode consiste à déposer les PDF dans `documents/`, puis à lancer depuis
+ce dossier :
 
 ```powershell
 .\.venv\Scripts\python.exe .\rag.py
@@ -82,6 +139,38 @@ du modèle Ollama. Il est déjà en cache après l'indexation précédente ;
 `HF_HUB_OFFLINE=1` évite les vérifications réseau répétées. Sur un autre ordinateur
 ou si le modèle n'est pas en cache, mets temporairement `HF_HUB_OFFLINE=0`, lance
 `rag.py` avec Internet, puis remets `HF_HUB_OFFLINE=1`.
+
+## Mesurer la recherche RAG
+
+Le jeu de référence `evaluation/questions.json` s'appuie sur le PDF
+`Comprendre l'IA pour développeurs.pdf`, qui n'est pas inclus dans GitHub. Il doit
+être présent dans `documents/` et indexé. Après avoir mis à jour l'index, lance :
+
+```powershell
+.\.venv\Scripts\python.exe .\evaluer_rag.py
+```
+
+Le script compare les pages retrouvées parmi les 1, 2, 4 ou 6 premiers passages.
+`Hit@k` indique la proportion de questions pour lesquelles au moins une page
+attendue apparaît. `Recall@k` indique la proportion moyenne des pages attendues
+retrouvées. `MRR@k` favorise les réglages qui placent une bonne page plus haut dans
+les résultats. Le tableau aide à voir si envoyer plus de passages améliore la
+recherche ou ajoute surtout du contexte moins pertinent. Le détail affiche aussi
+les passages et les réponses de référence pour inspection manuelle.
+La toute première exécution peut prendre du temps car le modèle d'embedding doit
+se charger ; cette évaluation ne démarre pas Ollama.
+
+Ces scores ne signifient pas automatiquement que les réponses générées sont
+correctes : ils vérifient seulement que la recherche retrouve les bonnes pages.
+Pour tester avec d'autres PDF, adapte `evaluation/questions.json` : écris des
+questions, leurs réponses de référence, le nom du document et ses pages utiles.
+
+Pour mettre à jour une installation déjà clonée afin d'ajouter le bouton PDF,
+installe la nouvelle dépendance de réception des fichiers depuis PowerShell :
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
 
 ## Tester Ollama seul
 
@@ -109,6 +198,18 @@ discussion » efface les messages affichés et le contexte transmis au modèle.
 
 La première réponse après le démarrage peut prendre plus de temps : Ollama doit
 charger son modèle. Pendant la recherche, l'interface affiche une animation.
+Après avoir ajouté un PDF, attends le message « Document prêt », puis pose une
+question sur son contenu. Un PDF scanné peut nécessiter une reconnaissance de texte
+(OCR), qui n'est pas encore incluse dans le projet.
+
+Les réponses sont gardées dans `index/reponses_cache.sqlite3` (au plus 500 entrées).
+Une réponse est réutilisée quand la question, l'historique pertinent, les passages
+retrouvés et le modèle sont identiques. Si un nouveau PDF change les passages
+retrouvés, le chatbot génère une nouvelle réponse. Le terminal affiche `cache=hit`
+quand Ollama a été évité, ou `cache=miss` quand une nouvelle génération a été
+nécessaire, ainsi que les durées de recherche et de génération.
+L'ajout d'un PDF peut ralentir son indexation ; la génération dépend surtout du
+modèle local et de l'ordinateur.
 
 ## Tester l'API directement
 
