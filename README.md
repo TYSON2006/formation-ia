@@ -251,8 +251,11 @@ n'utilise pas de clé API payante.
 2. Ouvre PowerShell dans le dossier `formation-ia` et lance :
 
    ```powershell
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
    .\lancer_famille.ps1
    ```
+
+   Ce réglage de stratégie ne vaut que pour cette fenêtre PowerShell.
 
 3. Le script affiche une adresse locale, par exemple
    `http://192.168.1.7:8000/?v=tyson-ai-v1`. Ouvre cette adresse sur l'ordinateur
