@@ -1,6 +1,7 @@
 """API FastAPI du chatbot documentaire."""
 
 import hashlib
+import logging
 import os
 import re
 import tempfile
@@ -20,6 +21,7 @@ from rag import DOSSIER_DOCUMENTS, indexer_pdf, repondre
 app = FastAPI(title="Tyson AI — Tuteur pédagogique", version="0.1.0")
 DOSSIER = Path(__file__).resolve().parent
 TAILLE_MAX_PDF = 20 * 1024 * 1024
+LOGGER = logging.getLogger(__name__)
 app.mount("/static", StaticFiles(directory=DOSSIER / "static"), name="static")
 
 
@@ -136,12 +138,14 @@ def ajouter_document(fichier: UploadFile = File(...)) -> dict:
     try:
         return indexer_pdf(destination)
     except PdfReadError as erreur:
+        LOGGER.exception("Le PDF reçu est illisible : %s", destination.name)
         destination.unlink(missing_ok=True)
         raise HTTPException(
             status_code=422,
             detail="Ce PDF est illisible ou protégé par un mot de passe.",
         ) from erreur
     except Exception as erreur:
+        LOGGER.exception("L'indexation du PDF a échoué : %s", destination.name)
         destination.unlink(missing_ok=True)
         raise HTTPException(
             status_code=500,
