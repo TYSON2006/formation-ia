@@ -55,6 +55,7 @@ propres documents dans `documents/`.
 | `evaluation/questions.json` | Questions de référence, réponses attendues et pages à retrouver dans le cours d'introduction à l'IA. |
 | `evaluer_rag.py` | Mesure si les bonnes pages sont retrouvées avec `k = 1, 2, 4, 6`. Le script n'appelle pas Ollama. |
 | `requirements.txt` | Dépendances Python nécessaires au projet. |
+| `lancer_famille.ps1` | Détecte l'adresse Wi-Fi et démarre le serveur web pour un essai sur le réseau local. |
 | `.env.example` | Exemple de réglages locaux pour Ollama ; à copier vers `.env`. |
 | `.env` | Réglages privés de ta machine. Ce fichier est ignoré par Git. |
 | `.gitignore` | Empêche l'envoi de `.env`, des environnements Python, de l'index et des PDF locaux. |
@@ -84,8 +85,13 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
   recevoir le fichier envoyé par le navigateur.
 - `static/index.html` : ajout du bouton `+ PDF` et du sélecteur de fichier dans
   la zone de saisie.
+- `static/index.html` : précision que les PDF téléversés depuis les téléphones
+  sont enregistrés sur l'ordinateur qui héberge le chatbot.
 - `static/app.js` : envoi du PDF à l'API, désactivation temporaire des actions
   pendant l'indexation, et affichage du résultat ou d'une erreur dans le chat.
+- `lancer_famille.ps1` et `README.md` : démarrage du chatbot sur l'adresse Wi-Fi de
+  l'ordinateur hôte, étapes d'accès depuis les appareils familiaux et réglage du
+  pare-feu Windows si nécessaire.
 - `static/style.css` : style du bouton PDF et ajustement de la zone de saisie.
 - `evaluer_rag.py` : nouveau script de mesure qui compare la recherche à
   `k = 1, 2, 4, 6` sans démarrer Ollama.
@@ -111,7 +117,8 @@ py -m venv .venv
 Copy-Item .env.example .env
 ```
 
-Chaque personne doit avoir Python et Ollama installés sur son ordinateur. Le
+L'ordinateur hôte doit avoir Python et Ollama installés. Pour un essai familial
+sur le même Wi-Fi, les autres personnes n'ont besoin que d'un navigateur. Le
 fichier `.env` est local et ne doit pas être envoyé sur GitHub.
 
 ## Préparation
@@ -232,6 +239,44 @@ charger son modèle. Pendant la recherche, l'interface affiche une animation.
 Après avoir ajouté un PDF, attends le message « Document prêt », puis pose une
 question sur son contenu. Un PDF scanné peut nécessiter une reconnaissance de texte
 (OCR), qui n'est pas encore incluse dans le projet.
+
+## Faire un essai avec la famille sur le même Wi-Fi
+
+Le chatbot peut tourner sur ton ordinateur et être ouvert depuis les téléphones
+ou ordinateurs connectés au même réseau Wi-Fi. Ollama et les PDF restent sur ton
+ordinateur ; les autres appareils utilisent seulement le navigateur. Cet essai
+n'utilise pas de clé API payante.
+
+1. Démarre l'application Ollama sur ton ordinateur.
+2. Ouvre PowerShell dans le dossier `formation-ia` et lance :
+
+   ```powershell
+   .\lancer_famille.ps1
+   ```
+
+3. Le script affiche une adresse locale, par exemple
+   `http://192.168.1.7:8000/?v=tyson-ai-v1`. Ouvre cette adresse sur l'ordinateur
+   hôte et transmets-la aux membres de la famille, qui doivent être sur le même
+   Wi-Fi.
+4. Si Windows affiche une demande de pare-feu, autorise Python sur les réseaux
+   privés. Laisse la fenêtre PowerShell ouverte pendant l'essai ; `Ctrl+C` arrête
+   le serveur.
+
+Si le téléphone n'arrive pas à ouvrir la page et que Windows n'a pas affiché de
+demande de pare-feu, vérifie que le Wi-Fi de la maison est défini comme réseau
+privé dans **Paramètres > Réseau et Internet > Wi-Fi**. Puis ouvre PowerShell en
+tant qu'administrateur et ajoute une règle limitée au port du chatbot et au réseau
+local :
+
+```powershell
+New-NetFirewallRule -DisplayName "Tyson AI - essai famille TCP 8000" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8000 -Profile Private -RemoteAddress LocalSubnet
+```
+
+Les PDF ajoutés depuis un téléphone sont envoyés et enregistrés dans le dossier
+`documents/` de l'ordinateur hôte ; ils deviennent disponibles aux autres
+utilisateurs du chatbot. Le serveur dépend de cet ordinateur : s'il se met en
+veille ou se déconnecte du Wi-Fi, le chatbot devient inaccessible. Pour un premier
+essai, posez les questions à tour de rôle afin de ne pas ralentir le modèle local.
 
 Les réponses sont gardées dans `index/reponses_cache.sqlite3` (au plus 500 entrées).
 Une réponse est réutilisée quand la question, l'historique pertinent, les passages
