@@ -32,7 +32,9 @@ NOMBRE_EXTRAITS = 2
 REPONSE_SANS_SOURCE = "Je ne trouve pas cette information dans les supports de cours indexés."
 LOGGER = logging.getLogger(__name__)
 FICHIER_CACHE_REPONSES = DOSSIER_INDEX / "reponses_cache.sqlite3"
-VERSION_PROMPT = "tuteur-pedagogique-v1"
+# Identité de la version du prompt pédagogique conçue par Tyson.
+# À incrémenter si ses consignes changent : cela renouvelle les clés du cache.
+VERSION_PROMPT = "tuteur-pedagogique-v1-by-tyson"
 TAILLE_MAX_CACHE = 500
 
 

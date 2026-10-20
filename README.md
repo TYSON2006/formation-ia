@@ -1,4 +1,4 @@
-# Tuteur pédagogique IA (Ollama + RAG)
+# Tyson AI — tuteur pédagogique (Ollama + RAG)
 
 Cette version utilise Ollama en local. Les réponses sont générées sur ton
 ordinateur ; aucune clé API Mistral n'est nécessaire.
@@ -10,6 +10,15 @@ comprendre leurs supports de cours. Il explique avec des mots simples, peut donn
 un exemple lorsque les PDF le permettent et indique les pages qui justifient sa
 réponse. Il reconnaît aussi quand les supports indexés ne contiennent pas la
 réponse.
+
+## Identité du projet
+
+L'application s'appelle **Tyson AI** et son interface affiche sa création par
+Tyson. Le prompt de comportement porte l'identifiant
+`VERSION_PROMPT = "tuteur-pedagogique-v1-by-tyson"` dans `rag.py` : il sert à
+repérer la version du tuteur et fait partie de la clé du cache. Quand les
+consignes du tuteur changent de façon importante, incrémente cette version pour
+éviter de réutiliser les réponses produites par une ancienne version.
 
 Le tuteur n'a pas été réentraîné sur un domaine. Avec le RAG, son sujet dépend des
 PDF ajoutés : le cours de départ porte sur l'IA pour développeurs. Pour le
@@ -63,6 +72,12 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
 - `rag.py`, `static/index.html` et `static/app.js` : positionnement du chatbot comme
   tuteur pédagogique pour apprenants ; le prompt demande des explications simples,
   des exemples tirés des supports et des sources vérifiables.
+- `rag.py` : identification de la version du prompt pédagogique sous le nom Tyson ;
+  cet identifiant permet aussi de renouveler le cache lorsque le prompt évolue.
+- `main.py`, `static/index.html`, `static/style.css` et `static/tyson-logo.svg` :
+  personnalisation du nom Tyson AI, ajout de la signature dans l'interface,
+  création d'un logo original et nouvelle palette vert canard, avec mise en page
+  adaptée aux téléphones.
 - `llm.py` et `.env.example` : modèle conservé en mémoire plus longtemps et limite
   de génération réduite pour obtenir des réponses plus courtes.
 - `requirements.txt` : ajout de `python-multipart`, utilisé par FastAPI pour
