@@ -35,7 +35,10 @@ def empreinte_fichier(chemin: Path) -> str:
 @app.get("/", include_in_schema=False)
 def accueil() -> FileResponse:
     """Affiche l'interface web du chatbot."""
-    return FileResponse(DOSSIER / "static" / "index.html")
+    return FileResponse(
+        DOSSIER / "static" / "index.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 @app.post("/documents")
