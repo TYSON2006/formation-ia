@@ -6,11 +6,57 @@ const pdfInput = document.querySelector("#pdf-file");
 const newChatButton = document.querySelector("#new-chat");
 const messages = document.querySelector("#messages");
 const welcome = document.querySelector("#welcome");
+const welcomeTitle = document.querySelector("#welcome-title");
+const folderList = document.querySelector("#folder-list");
+const conversationList = document.querySelector("#conversation-list");
+const newFolderButton = document.querySelector("#new-folder");
+const sidebarNewChatButton = document.querySelector("#sidebar-new-chat");
+const sidebar = document.querySelector("#workspace-sidebar");
+const sidebarToggle = document.querySelector("#toggle-sidebar");
+const moveConversation = document.querySelector("#move-conversation");
+const webSearchToggle = document.querySelector("#web-search");
+const webSearchStatus = document.querySelector("#web-search-status");
 const status = document.querySelector(".connection-state");
 const statusText = document.querySelector("#status-text");
 
 let historique = [];
 let requestEnCours = false;
+let espacePartage = { dossiers: [], sans_dossier: [] };
+let filtreDossier = "tous";
+let discussionActive = null;
+
+function afficherAccueilAleatoire() {
+  const accueils = [
+    "Bienvenue, agent X ! De quel sujet veux-tu parler aujourd’hui ?",
+    "Nouvelle session, agent X. Quelle notion veux-tu éclaircir ?",
+    "Ravi de te retrouver, agent X. Quel défi veux-tu relever aujourd’hui ?",
+    "Briefing prêt, agent X. Qu’aimerais-tu apprendre ou construire ?",
+    "Agent X, quelle idée veux-tu transformer en code aujourd’hui ?",
+    "Bienvenue dans ton espace d’apprentissage, agent X. On commence par quoi ?",
+  ];
+
+  let dernierIndex = -1;
+  try {
+    dernierIndex = Number.parseInt(localStorage.getItem("tyson-ai-accueil-index"), 10);
+    if (!Number.isInteger(dernierIndex)) dernierIndex = -1;
+  } catch {
+    // Le stockage peut être bloqué dans certains modes de navigation privée.
+  }
+
+  const choixPossibles = accueils
+    .map((_, index) => index)
+    .filter((index) => index !== dernierIndex);
+  const nouvelIndex = choixPossibles[Math.floor(Math.random() * choixPossibles.length)];
+  welcomeTitle.textContent = accueils[nouvelIndex];
+
+  try {
+    localStorage.setItem("tyson-ai-accueil-index", String(nouvelIndex));
+  } catch {
+    // L’accueil reste aléatoire même si le navigateur refuse de mémoriser le choix.
+  }
+}
+
+afficherAccueilAleatoire();
 
 function mettreAJourBoutons() {
   sendButton.disabled = requestEnCours || !questionField.value.trim();
@@ -27,6 +73,160 @@ function faireDefilerEnBas() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+async function appelerAPI(url, options = {}) {
+  const response = await fetch(url, options);
+  const resultat = response.status === 204 ? {} : await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof resultat.detail === "string" ? resultat.detail : "La demande n'a pas abouti.");
+  }
+  return resultat;
+}
+
+function fermerMenuMobile() {
+  sidebar.classList.remove("is-open");
+  sidebarToggle.setAttribute("aria-expanded", "false");
+}
+
+function creerBoutonDossier(id, nom, compte, actif) {
+  const bouton = document.createElement("button");
+  bouton.className = `folder-row${actif ? " is-active" : ""}`;
+  bouton.type = "button";
+  bouton.setAttribute("aria-pressed", String(actif));
+  const icone = document.createElement("span");
+  icone.className = "folder-icon";
+  icone.setAttribute("aria-hidden", "true");
+  icone.textContent = id === "tous" ? "◫" : "▱";
+  const libelle = document.createElement("span");
+  libelle.textContent = nom;
+  const nombre = document.createElement("span");
+  nombre.className = "folder-count";
+  nombre.textContent = String(compte);
+  bouton.append(icone, libelle, nombre);
+  bouton.addEventListener("click", () => {
+    filtreDossier = String(id);
+    afficherEspace();
+  });
+  return bouton;
+}
+
+function afficherEspace() {
+  folderList.replaceChildren();
+  const toutesLesDiscussions = [
+    ...espacePartage.sans_dossier,
+    ...espacePartage.dossiers.flatMap((dossier) => dossier.discussions),
+  ];
+  folderList.append(
+    creerBoutonDossier("tous", "Tous les dossiers", toutesLesDiscussions.length, filtreDossier === "tous"),
+    creerBoutonDossier("aucun", "Sans dossier", espacePartage.sans_dossier.length, filtreDossier === "aucun"),
+  );
+  for (const dossier of espacePartage.dossiers) {
+    folderList.append(
+      creerBoutonDossier(dossier.id, dossier.nom, dossier.discussions.length, filtreDossier === String(dossier.id)),
+    );
+  }
+
+  const discussions = filtreDossier === "tous"
+    ? toutesLesDiscussions.sort((a, b) => b.modifie_le - a.modifie_le)
+    : filtreDossier === "aucun"
+      ? espacePartage.sans_dossier
+      : espacePartage.dossiers.find((dossier) => String(dossier.id) === filtreDossier)?.discussions ?? [];
+  conversationList.replaceChildren();
+  if (discussions.length === 0) {
+    const vide = document.createElement("p");
+    vide.className = "empty-list";
+    vide.textContent = "Aucune discussion ici. Utilise + pour en créer une.";
+    conversationList.append(vide);
+  } else {
+    for (const discussion of discussions) {
+      const bouton = document.createElement("button");
+      bouton.className = `conversation-row${discussion.id === discussionActive ? " is-active" : ""}`;
+      bouton.type = "button";
+      bouton.title = discussion.titre;
+      const icone = document.createElement("span");
+      icone.className = "conversation-icon";
+      icone.setAttribute("aria-hidden", "true");
+      icone.textContent = "◌";
+      const titre = document.createElement("span");
+      titre.textContent = discussion.titre;
+      bouton.append(icone, titre);
+      bouton.addEventListener("click", () => ouvrirDiscussion(discussion.id));
+      conversationList.append(bouton);
+    }
+  }
+
+  const dossierActif = espacePartage.dossiers.find((dossier) => String(dossier.id) === filtreDossier);
+  const dossierDeLaDiscussion = espacePartage.dossiers.find((dossier) =>
+    dossier.discussions.some((discussion) => discussion.id === discussionActive));
+  moveConversation.replaceChildren();
+  const optionSansDossier = document.createElement("option");
+  optionSansDossier.value = "";
+  optionSansDossier.textContent = "Sans dossier";
+  moveConversation.append(optionSansDossier);
+  for (const dossier of espacePartage.dossiers) {
+    const option = document.createElement("option");
+    option.value = String(dossier.id);
+    option.textContent = dossier.nom;
+    moveConversation.append(option);
+  }
+  moveConversation.disabled = !discussionActive;
+  if (discussionActive && dossierDeLaDiscussion) {
+    moveConversation.value = String(dossierDeLaDiscussion.id);
+  } else {
+    moveConversation.value = "";
+  }
+  if (dossierActif && filtreDossier === "tous") moveConversation.value = "";
+}
+
+async function actualiserEspace() {
+  espacePartage = await appelerAPI("/api/espace");
+  afficherEspace();
+}
+
+function afficherDiscussionVide() {
+  historique = [];
+  messages.replaceChildren(welcome);
+  questionField.value = "";
+  questionField.style.height = "auto";
+  afficherStatut("Nouvelle discussion");
+  mettreAJourBoutons();
+}
+
+async function creerDiscussion(dossierId = null) {
+  const discussion = await appelerAPI("/api/discussions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ dossier_id: dossierId }),
+  });
+  discussionActive = discussion.id;
+  afficherDiscussionVide();
+  await actualiserEspace();
+  fermerMenuMobile();
+  return discussion;
+}
+
+async function ouvrirDiscussion(identifiant) {
+  try {
+    const discussion = await appelerAPI(`/api/discussions/${encodeURIComponent(identifiant)}`);
+    discussionActive = discussion.id;
+    historique = discussion.messages.map((message) => ({ role: message.role, content: message.content }));
+    messages.replaceChildren();
+    if (discussion.messages.length === 0) {
+      messages.append(welcome);
+    } else {
+      for (const message of discussion.messages) {
+        ajouterMessage(message.role, message.content, message.sources ?? []);
+      }
+    }
+    afficherEspace();
+    afficherStatut(`Discussion : ${discussion.titre}`);
+    fermerMenuMobile();
+    questionField.focus();
+  } catch (erreur) {
+    ajouterMessage("assistant", erreur.message, [], { error: true });
+    afficherStatut("Impossible d’ouvrir la discussion", "error");
+  }
+}
+
 function ajouterMessage(role, texte, sources = [], options = {}) {
   const article = document.createElement("article");
   article.className = `message ${role}${options.error ? " is-error" : ""}`;
@@ -34,14 +234,14 @@ function ajouterMessage(role, texte, sources = [], options = {}) {
   const avatar = document.createElement("div");
   avatar.className = "message-avatar";
   avatar.setAttribute("aria-hidden", "true");
-  avatar.textContent = role === "user" ? "TOI" : "IA";
+  avatar.textContent = role === "user" ? "MEM" : "IA";
 
   const main = document.createElement("div");
   main.className = "message-main";
 
   const meta = document.createElement("div");
   meta.className = "message-meta";
-  meta.textContent = role === "user" ? "Toi" : "Tuteur pédagogique";
+  meta.textContent = role === "user" ? "Membre du groupe" : "Tuteur pédagogique";
 
   const content = document.createElement("div");
   content.className = "message-content";
@@ -65,13 +265,23 @@ function ajouterMessage(role, texte, sources = [], options = {}) {
     sourceList.className = "source-list";
     const titre = document.createElement("div");
     titre.className = "source-heading";
-    titre.textContent = sources.length === 1 ? "SOURCE DU DOCUMENT" : "SOURCES DES DOCUMENTS";
+    const sourcesWeb = sources.filter((source) => source.url).length;
+    titre.textContent = sourcesWeb === sources.length
+      ? (sources.length === 1 ? "SOURCE WEB" : "SOURCES WEB")
+      : (sources.length === 1 ? "SOURCE DU DOCUMENT" : "SOURCES DES DOCUMENTS");
     sourceList.append(titre);
 
     for (const source of sources) {
-      const chip = document.createElement("span");
+      const chip = source.url ? document.createElement("a") : document.createElement("span");
       chip.className = "source-chip";
-      chip.textContent = `${source.source}, page ${source.page}`;
+      if (source.url) {
+        chip.href = source.url;
+        chip.target = "_blank";
+        chip.rel = "noopener noreferrer";
+        chip.textContent = source.title || source.url;
+      } else {
+        chip.textContent = `${source.source}, page ${source.page}`;
+      }
       sourceList.append(chip);
     }
     main.append(sourceList);
@@ -87,27 +297,34 @@ async function envoyerQuestion(question) {
   const texteQuestion = question.trim();
   if (!texteQuestion || requestEnCours) return;
 
-  welcome?.remove();
-  ajouterMessage("user", texteQuestion);
-  questionField.value = "";
-  questionField.style.height = "auto";
   requestEnCours = true;
   newChatButton.disabled = true;
   mettreAJourBoutons();
   afficherStatut("Recherche dans tes supports de cours…", "loading");
-  const messageAttente = ajouterMessage("assistant", "", [], { loading: true });
+  let messageAttente = null;
 
   try {
-    const response = await fetch("/ask", {
+    if (!discussionActive) {
+      const dossierId = /^\d+$/.test(filtreDossier) ? Number(filtreDossier) : null;
+      const discussion = await creerDiscussion(dossierId);
+      discussionActive = discussion.id;
+    }
+    welcome?.remove();
+    ajouterMessage("user", texteQuestion);
+    questionField.value = "";
+    questionField.style.height = "auto";
+    messageAttente = ajouterMessage("assistant", "", [], { loading: true });
+
+    const resultat = await appelerAPI("/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: texteQuestion, historique: historique.slice(-6) }),
+      body: JSON.stringify({
+        question: texteQuestion,
+        historique: historique.slice(-6),
+        conversation_id: discussionActive,
+        rechercher_sur_web: webSearchToggle.checked,
+      }),
     });
-    const resultat = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = typeof resultat.detail === "string" ? resultat.detail : "Le serveur n'a pas pu traiter la question.";
-      throw new Error(detail);
-    }
 
     messageAttente.remove();
     ajouterMessage("assistant", resultat.reponse, resultat.sources ?? []);
@@ -115,9 +332,10 @@ async function envoyerQuestion(question) {
       { role: "user", content: texteQuestion },
       { role: "assistant", content: resultat.reponse },
     );
+    await actualiserEspace();
     afficherStatut("Réponse prête");
   } catch (erreur) {
-    messageAttente.remove();
+    messageAttente?.remove();
     const detail = erreur instanceof TypeError
       ? "Impossible de joindre le serveur. Vérifie que FastAPI est démarré dans le terminal."
       : erreur.message;
@@ -144,19 +362,13 @@ async function importerPDF(fichier) {
   donnees.append("fichier", fichier);
 
   try {
-    const response = await fetch("/documents", { method: "POST", body: donnees });
-    const resultat = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = typeof resultat.detail === "string"
-        ? resultat.detail
-        : "Le serveur n'a pas pu ajouter ce PDF.";
-      throw new Error(detail);
-    }
+    const resultat = await appelerAPI("/documents", { method: "POST", body: donnees });
 
     const resume = resultat.chunks > 0
       ? `Document ajouté : ${resultat.source}\n${resultat.pages} page(s), ${resultat.chunks} passage(s) indexé(s). Tu peux maintenant poser une question dessus.`
       : `Document ajouté : ${resultat.source}\nAucun texte sélectionnable n'a été trouvé. Ce PDF est peut-être scanné.`;
     ajouterMessage("assistant", resume);
+    await actualiserEspace();
     afficherStatut("Document prêt");
   } catch (erreur) {
     const detail = erreur instanceof TypeError
@@ -202,12 +414,67 @@ document.querySelectorAll(".suggestion").forEach((suggestion) => {
   suggestion.addEventListener("click", () => envoyerQuestion(suggestion.dataset.question));
 });
 
-newChatButton.addEventListener("click", () => {
-  historique = [];
-  messages.replaceChildren(welcome);
-  questionField.value = "";
-  questionField.style.height = "auto";
-  afficherStatut("Nouvelle discussion");
-  mettreAJourBoutons();
-  questionField.focus();
+async function nouvelleDiscussionDepuisInterface() {
+  if (requestEnCours) return;
+  try {
+    const dossierId = /^\d+$/.test(filtreDossier) ? Number(filtreDossier) : null;
+    await creerDiscussion(dossierId);
+    questionField.focus();
+  } catch (erreur) {
+    afficherStatut(erreur.message, "error");
+  }
+}
+
+newChatButton.addEventListener("click", nouvelleDiscussionDepuisInterface);
+sidebarNewChatButton.addEventListener("click", nouvelleDiscussionDepuisInterface);
+
+newFolderButton.addEventListener("click", async () => {
+  const nom = window.prompt("Quel nom donner à ce dossier partagé ?")?.trim();
+  if (!nom) return;
+  try {
+    const dossier = await appelerAPI("/api/dossiers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nom }),
+    });
+    filtreDossier = String(dossier.id);
+    await actualiserEspace();
+    afficherStatut(`Dossier « ${dossier.nom} » créé`);
+  } catch (erreur) {
+    afficherStatut(erreur.message, "error");
+  }
+});
+
+moveConversation.addEventListener("change", async () => {
+  if (!discussionActive) return;
+  try {
+    await appelerAPI(`/api/discussions/${encodeURIComponent(discussionActive)}/dossier`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dossier_id: moveConversation.value ? Number(moveConversation.value) : null }),
+    });
+    await actualiserEspace();
+    afficherStatut("Discussion rangée");
+  } catch (erreur) {
+    afficherStatut(erreur.message, "error");
+  }
+});
+
+sidebarToggle.addEventListener("click", () => {
+  const ouvert = sidebar.classList.toggle("is-open");
+  sidebarToggle.setAttribute("aria-expanded", String(ouvert));
+});
+
+actualiserEspace().catch((erreur) => {
+  afficherStatut(`Les dossiers partagés ne sont pas disponibles : ${erreur.message}`, "error");
+});
+
+appelerAPI("/api/config").then((configuration) => {
+  webSearchToggle.disabled = !configuration.recherche_web_disponible;
+  webSearchToggle.checked = configuration.recherche_web_disponible;
+  webSearchStatus.textContent = configuration.recherche_web_disponible
+    ? "Tavily actif · une recherche par question"
+    : "Clé TAVILY_API_KEY requise dans .env";
+}).catch(() => {
+  webSearchStatus.textContent = "Recherche web indisponible";
 });

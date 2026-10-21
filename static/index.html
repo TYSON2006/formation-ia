@@ -6,14 +6,14 @@
     <meta name="theme-color" content="#f3f7f6">
     <meta name="description" content="Tyson AI, un tuteur pédagogique pour comprendre tes supports de cours.">
     <title>Tyson AI — Tuteur pédagogique</title>
-    <link rel="stylesheet" href="/static/style.css?v=tyson-ai-v1">
-    <script src="/static/app.js?v=tyson-ai-v1" defer></script>
+    <link rel="stylesheet" href="/static/style.css?v=tyson-ai-v2">
+    <script src="/static/app.js?v=tyson-ai-v2" defer></script>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <a class="brand" href="/" aria-label="Tyson AI, accueil">
-          <img class="brand-logo" src="/static/tyson-logo.svg?v=tyson-ai-v1" alt="">
+          <img class="brand-logo" src="/static/tyson-logo.svg?v=tyson-ai-v2" alt="">
           <span class="brand-copy">
             <span class="brand-name">Tyson <span>AI</span></span>
             <span class="brand-tagline">TUTEUR PÉDAGOGIQUE</span>
@@ -21,6 +21,7 @@
         </a>
 
         <div class="topbar-actions">
+          <button class="sidebar-toggle" id="toggle-sidebar" type="button" aria-label="Afficher les dossiers" aria-expanded="false">☰</button>
           <div class="connection-state" role="status" aria-live="polite">
             <span class="connection-dot" aria-hidden="true"></span>
             <span id="status-text">Prêt à discuter</span>
@@ -32,21 +33,45 @@
         </div>
       </header>
 
-      <main class="chat-layout">
+      <main class="workspace-layout">
+        <aside class="workspace-sidebar" id="workspace-sidebar" aria-label="Dossiers et discussions partagés">
+          <div class="sidebar-section-heading">
+            <div>
+              <p class="eyebrow">ESPACE COMMUN</p>
+              <h2>Dossiers</h2>
+            </div>
+            <button class="small-action" id="new-folder" type="button" title="Créer un dossier">＋</button>
+          </div>
+          <nav class="folder-list" id="folder-list" aria-label="Filtrer par dossier"></nav>
+          <div class="discussion-section-heading">
+            <span>DISCUSSIONS</span>
+            <button class="small-action" id="sidebar-new-chat" type="button" title="Nouvelle discussion">＋</button>
+          </div>
+          <div class="conversation-list" id="conversation-list" aria-live="polite"></div>
+          <p class="shared-note">Les dossiers et les échanges sont partagés avec les personnes qui utilisent ce serveur.</p>
+        </aside>
+
+        <section class="chat-layout">
         <section class="chat-panel" aria-label="Discussion avec le tuteur pédagogique">
           <div class="chat-heading">
             <div class="heading-icon" aria-hidden="true">✦</div>
             <div>
               <p class="eyebrow">TON TUTEUR PÉDAGOGIQUE</p>
               <h1>Comprenons tes cours ensemble.</h1>
-              <p class="heading-description">Pose une question sur tes supports. Je t’expliquerai la notion simplement et j’indiquerai les pages utilisées.</p>
+              <p class="heading-description">Pose une question sur tes supports. Je t’expliquerai la notion simplement et j’indiquerai les pages ou liens utilisés.</p>
+              <div class="conversation-tools">
+                <label for="move-conversation">Ranger cette discussion</label>
+                <select id="move-conversation" aria-label="Dossier de cette discussion" disabled>
+                  <option value="">Sans dossier</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <div class="messages" id="messages" role="log" aria-live="polite" aria-relevant="additions text">
             <div class="welcome-card" id="welcome">
-              <p class="welcome-title">Par quoi veux-tu commencer ?</p>
-              <p class="welcome-description">Choisis une question ou demande une explication sur tes supports de cours.</p>
+              <p class="welcome-title" id="welcome-title">Par quoi veux-tu commencer ?</p>
+              <p class="welcome-description">Choisis une question ou demande une explication avec tes supports de cours.</p>
               <div class="suggestions">
                 <button class="suggestion" type="button" data-question="Qu'est-ce qu'un token dans un modèle de langage ?">
                   <span aria-hidden="true">⌕</span>
@@ -80,8 +105,14 @@
                 <span aria-hidden="true">↑</span>
               </button>
             </form>
+            <label class="web-search-option" for="web-search">
+              <input id="web-search" type="checkbox" disabled>
+              <span>Ajouter des sources web</span>
+              <span class="web-search-status" id="web-search-status">Clé Tavily à configurer</span>
+            </label>
             <p class="composer-hint">Les PDF sont stockés sur l’ordinateur qui héberge le chat <span>·</span> <kbd>Entrée</kbd> pour envoyer <span>·</span> <kbd>Maj + Entrée</kbd> pour une nouvelle ligne</p>
           </div>
+        </section>
         </section>
       </main>
 

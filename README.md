@@ -1,21 +1,22 @@
 # Tyson AI — tuteur pédagogique (Ollama + RAG)
 
 Cette version utilise Ollama en local. Les réponses sont générées sur ton
-ordinateur ; aucune clé API Mistral n'est nécessaire.
+ordinateur ; aucune clé API Mistral n'est nécessaire. Une clé Tavily facultative
+active la recherche web et les liens vers les pages réellement trouvées.
 
 ## Objectif pédagogique
 
 Le projet est un tuteur qui aide les apprenants, notamment les débutants, à
 comprendre leurs supports de cours. Il explique avec des mots simples, peut donner
-un exemple lorsque les PDF le permettent et indique les pages qui justifient sa
-réponse. Il reconnaît aussi quand les supports indexés ne contiennent pas la
-réponse.
+un exemple lorsque les sources le permettent et indique les pages ou liens qui
+justifient sa réponse. Il reconnaît aussi quand les sources consultées ne
+contiennent pas la réponse.
 
 ## Identité du projet
 
 L'application s'appelle **Tyson AI** et son interface affiche sa création par
 Tyson. Le prompt de comportement porte l'identifiant
-`VERSION_PROMPT = "tuteur-pedagogique-v2-by-tyson"` dans `rag.py` : il sert à
+`VERSION_PROMPT = "tuteur-pedagogique-v3-by-tyson"` dans `rag.py` : il sert à
 repérer la version du tuteur et fait partie de la clé du cache. Quand les
 consignes ou la stratégie de recherche changent de façon importante, incrémente
 cette version pour éviter de réutiliser les réponses produites par une ancienne
@@ -24,20 +25,21 @@ version.
 Le tuteur n'a pas été réentraîné sur un domaine. Ses capacités sont renforcées par
 le RAG : une recherche sémantique trouve des passages proches par le sens, puis
 un classement BM25 tient compte des termes exacts et diversifie les pages
-sélectionnées. Le sujet traité dépend des PDF ajoutés. Pour travailler une autre
-matière, ajoute ses supports et des questions de référence pour évaluer ses
-réponses.
+sélectionnées. Les dossiers et discussions sont partagés par tous les visiteurs
+du même serveur. Une recherche web facultative fournit au modèle des extraits et
+des URL retournés par Tavily ; le modèle ne fabrique pas les liens.
 
 ## Fonctionnement
 
 1. `rag.py` extrait le texte des PDF, le découpe et sauvegarde les embeddings
    dans `index/` avec ChromaDB.
 2. À chaque question, ChromaDB retrouve des passages pertinents.
-3. `llm.py` envoie les passages à Ollama et valide la réponse JSON.
-4. `main.py` expose l'API `POST /ask`, reçoit les PDF sur `POST /documents` et sert l'interface web du chat.
-5. L'interface garde les six derniers messages de la discussion pour aider à
-   comprendre les questions de suivi. Le bouton « Nouvelle discussion » efface
-   cet historique.
+3. `recherche_web.py` peut compléter ces passages avec des résultats web facultatifs.
+4. `llm.py` envoie le contexte à Ollama et valide la réponse JSON.
+5. `main.py` expose l'API du chat, des PDF, des dossiers et des discussions partagés.
+6. `espaces.py` conserve les dossiers, les discussions et les messages dans SQLite.
+7. L'interface retrouve les conversations enregistrées et conserve leur historique
+   pour les questions de suivi. L'accueil varie lors du rechargement de la page.
 
 Les passages gardent le nom du PDF et le numéro de page pour afficher les sources.
 Les PDF de formation ne sont pas publiés dans ce dépôt ; chacun peut ajouter ses
@@ -47,19 +49,21 @@ propres documents dans `documents/`.
 
 | Fichier ou dossier | Rôle dans le projet |
 | --- | --- |
-| `main.py` | API FastAPI et interface web : `POST /ask` répond aux questions, `POST /documents` reçoit un PDF (20 Mo maximum), détecte les copies exactes et l'indexe. |
+| `main.py` | API FastAPI : `POST /ask`, import de PDF, endpoints `/api/dossiers` et `/api/discussions`, configuration web et service des fichiers de l'interface. |
 | `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, les stocke dans ChromaDB, récupère jusqu'à 24 candidats et les reclasse avec recherche sémantique, BM25 et diversité des pages ; prépare les sources et gère le cache des réponses. |
+| `espaces.py` | Enregistre dans SQLite les dossiers communs, les discussions, leurs messages et les sources ; permet de reprendre les conversations après un rechargement. |
+| `recherche_web.py` | Interroge Tavily avec une clé serveur facultative, limite les résultats transmis au modèle et écarte les URL non HTTP(S). |
 | `llm.py` | Envoie les passages à Ollama, demande une réponse JSON concise et vérifie que le JSON reçu est valide. |
-| `static/index.html` | Structure de la page du chat, de la zone de saisie et du bouton d'ajout PDF. |
-| `static/style.css` | Apparence de l'interface et adaptation aux petits écrans. |
-| `static/app.js` | Envoi des questions, historique de discussion, ajout de PDF et affichage des réponses, erreurs et sources. |
+| `static/index.html` | Structure du chat, de la barre des dossiers, du bouton PDF et de l'option de recherche web. |
+| `static/style.css` | Apparence du chat et des espaces partagés, avec une barre latérale adaptée aux téléphones. |
+| `static/app.js` | Navigation dans les dossiers, création/reprise des discussions, envoi des questions et PDF, affichage des sources PDF ou web et accueil variable. |
 | `documents/` | PDF locaux à indexer. Les fichiers PDF sont ignorés par Git et ne sont donc pas publiés. |
 | `index/` | Base ChromaDB et cache SQLite des réponses créés localement ; ils sont régénérables et ignorés par Git. |
 | `evaluation/questions.json` | Questions de référence, réponses attendues et pages à retrouver dans le cours d'introduction à l'IA. |
 | `evaluer_rag.py` | Mesure si les bonnes pages sont retrouvées avec `k = 1, 2, 4, 6`. Le script n'appelle pas Ollama. |
 | `requirements.txt` | Dépendances Python nécessaires au projet. |
 | `lancer_famille.ps1` | Détecte l'adresse Wi-Fi et démarre le serveur web pour un essai sur le réseau local. |
-| `.env.example` | Exemple de réglages locaux pour Ollama ; à copier vers `.env`. |
+| `.env.example` | Exemple des réglages Ollama et de la clé web facultative ; à copier vers `.env`. |
 | `.env` | Réglages privés de ta machine. Ce fichier est ignoré par Git. |
 | `.gitignore` | Empêche l'envoi de `.env`, des environnements Python, de l'index et des PDF locaux. |
 
@@ -111,6 +115,15 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
   référence et pages utiles du cours.
 - `README.md` : ajout de cet inventaire et des instructions d'indexation et
   d'évaluation.
+- `espaces.py`, `main.py` : création de dossiers partagés, stockage SQLite des
+  discussions et de leurs messages, reprise des conversations et déplacement
+  d'une discussion entre dossiers.
+- `static/index.html`, `static/style.css`, `static/app.js` : ajout de la barre
+  latérale, des filtres par dossier, de la reprise des conversations, des liens
+  de sources cliquables et d'un accueil aléatoire à chaque rechargement.
+- `recherche_web.py`, `rag.py`, `main.py`, `.env.example` : ajout d'une recherche
+  web facultative avec Tavily et citations fondées sur les résultats retournés.
+- `README.md` : explication des dossiers partagés et configuration de Tavily.
 
 `llm.py` appelle toujours Ollama et valide le JSON reçu. Les durées affichées par
 `rag.py` permettent de voir si l'attente vient surtout de la recherche ou de la
@@ -160,7 +173,23 @@ OLLAMA_KEEP_ALIVE=30m
 OLLAMA_NUM_CTX=4096
 OLLAMA_NUM_PREDICT=160
 HF_HUB_OFFLINE=1
+TAVILY_API_KEY=
 ```
+
+Pour activer la recherche web, crée un compte Tavily, récupère ta clé API et
+remplace la ligne vide `TAVILY_API_KEY=` dans `.env`. Ne colle jamais cette clé
+dans `static/app.js`, dans GitHub ou dans un message partagé. Redémarre FastAPI
+après avoir modifié `.env`. L'option « Ajouter des sources web vérifiées » est
+alors activée dans le chat ; tu peux la décocher pour une question. Les résultats
+reçus sont présentés sous forme de liens cliquables. Sans clé Tavily, le chatbot
+continue à utiliser ses PDF et Ollama normalement.
+Quand cette option est active, la question (et le contexte de la dernière question
+pour une relance courte) sont envoyés à Tavily pour effectuer la recherche ; le
+contenu des PDF n'est pas envoyé à ce service.
+
+Tavily annonce actuellement 1 000 crédits API gratuits par mois sans carte
+bancaire. Consulte [la page officielle des tarifs Tavily](https://www.tavily.com/pricing)
+pour vérifier le quota et les conditions au moment de l'inscription.
 
 Ollama garde le modèle chargé pendant 30 minutes après une réponse. Cela peut
 accélérer la première question après une courte pause, en utilisant la mémoire de
@@ -241,10 +270,11 @@ Dans le terminal VS Code, place-toi dans le dossier `formation-ia`, puis lance :
 ```
 
 Laisse ce terminal ouvert et va sur <http://127.0.0.1:8000>. Tu peux cliquer sur
-une question proposée ou écrire la tienne. Après la réponse, les sources et leurs
-pages apparaissent sous le message. Pour vérifier le contexte, pose une question
-de suivi, par exemple « Peux-tu expliquer cela plus simplement ? ». « Nouvelle
-discussion » efface les messages affichés et le contexte transmis au modèle.
+une question proposée ou écrire la tienne. Après la réponse, les sources PDF et
+leurs pages ou les liens web apparaissent sous le message. Pour vérifier le
+contexte, pose une question de suivi, par exemple « Peux-tu expliquer cela plus
+simplement ? ». Le bouton « Nouvelle discussion » crée une conversation partagée
+qui reste dans la liste après un rechargement.
 
 La première réponse après le démarrage peut prendre plus de temps : Ollama doit
 charger son modèle. Pendant la recherche, l'interface affiche une animation.
@@ -256,8 +286,9 @@ question sur son contenu. Un PDF scanné peut nécessiter une reconnaissance de 
 
 Le chatbot peut tourner sur ton ordinateur et être ouvert depuis les téléphones
 ou ordinateurs connectés au même réseau Wi-Fi. Ollama et les PDF restent sur ton
-ordinateur ; les autres appareils utilisent seulement le navigateur. Cet essai
-n'utilise pas de clé API payante.
+ordinateur ; les autres appareils utilisent seulement le navigateur. En mode
+local seul, aucune clé API n'est requise. La recherche web facultative utilise le
+quota Tavily configuré sur l'ordinateur hôte.
 
 1. Démarre l'application Ollama sur ton ordinateur.
 2. Ouvre PowerShell dans le dossier `formation-ia` et lance :
@@ -292,6 +323,23 @@ Les PDF ajoutés depuis un téléphone sont envoyés et enregistrés dans le dos
 utilisateurs du chatbot. Le serveur dépend de cet ordinateur : s'il se met en
 veille ou se déconnecte du Wi-Fi, le chatbot devient inaccessible. Pour un premier
 essai, posez les questions à tour de rôle afin de ne pas ralentir le modèle local.
+Les dossiers et discussions n'ont pas de compte utilisateur : toute personne qui
+accède à cette adresse locale peut les lire. Garde le serveur sur un réseau de
+confiance et ne l'expose pas directement à Internet.
+
+## Tester les dossiers partagés et les sources web
+
+1. Dans l'interface, clique sur `＋` à côté de « Dossiers », crée par exemple
+   `Développement web`, puis sélectionne ce dossier.
+2. Clique sur `＋` à côté de « Discussions », pose une question et attends la
+   réponse. La discussion prend automatiquement le titre de ta première question.
+3. Recharge la page : le dossier et la discussion doivent rester dans la barre
+   latérale. Ouvre la discussion pour retrouver les messages et leurs sources.
+4. L'espace étant commun au serveur, les mêmes dossiers et discussions seront
+   visibles aux autres utilisateurs lorsqu'ils accéderont à cette application.
+5. Pour la recherche web, configure `TAVILY_API_KEY` dans `.env`, redémarre le
+   serveur et vérifie que la case « Ajouter des sources web » est active.
+   Pose une question factuelle, puis ouvre un lien affiché sous la réponse.
 
 Les réponses sont gardées dans `index/reponses_cache.sqlite3` (au plus 500 entrées).
 Une réponse est réutilisée quand la question, l'historique pertinent, les passages

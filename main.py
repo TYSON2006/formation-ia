@@ -4,6 +4,7 @@ import hashlib
 import logging
 import os
 import re
+import sqlite3
 import tempfile
 from pathlib import Path
 from typing import Literal
@@ -15,7 +16,19 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pypdf.errors import PdfReadError
 
+from espaces import (
+    creer_discussion,
+    creer_dossier,
+    deplacer_discussion,
+    enregistrer_tour,
+    historique as historique_persistant,
+    lister_espace,
+    obtenir_discussion,
+    supprimer_discussion,
+    supprimer_dossier,
+)
 from rag import DOSSIER_DOCUMENTS, indexer_pdf, repondre
+from recherche_web import recherche_web_disponible, rechercher
 
 
 app = FastAPI(title="Tyson AI — Tuteur pédagogique", version="0.1.0")
@@ -165,11 +178,27 @@ class Question(BaseModel):
         description="Question à poser aux documents indexés",
     )
     historique: list[MessageConversation] = Field(default_factory=list, max_length=6)
+    conversation_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
+    rechercher_sur_web: bool = False
+
+
+class NouveauDossier(BaseModel):
+    nom: str = Field(min_length=1, max_length=60)
+
+
+class NouvelleDiscussion(BaseModel):
+    dossier_id: int | None = None
+
+
+class DeplacementDiscussion(BaseModel):
+    dossier_id: int | None = None
 
 
 class Source(BaseModel):
-    source: str
-    page: int
+    source: str | None = None
+    page: int | None = None
+    title: str | None = None
+    url: str | None = None
 
 
 class Reponse(BaseModel):
@@ -177,17 +206,113 @@ class Reponse(BaseModel):
     sources: list[Source]
 
 
+@app.get("/api/espace")
+def consulter_espace() -> dict:
+    """Renvoie les dossiers et discussions partagés sur ce serveur."""
+    return lister_espace()
+
+
+@app.get("/api/config")
+def consulter_configuration() -> dict:
+    """Expose uniquement l'état des options, jamais leurs clés secrètes."""
+    return {"recherche_web_disponible": recherche_web_disponible()}
+
+
+@app.post("/api/dossiers", status_code=201)
+def ajouter_dossier(body: NouveauDossier) -> dict:
+    """Crée un dossier commun à tous les utilisateurs de l'application."""
+    try:
+        return creer_dossier(body.nom)
+    except ValueError as erreur:
+        raise HTTPException(status_code=422, detail=str(erreur)) from erreur
+    except sqlite3.IntegrityError as erreur:
+        raise HTTPException(status_code=409, detail="Un dossier porte déjà ce nom.") from erreur
+
+
+@app.delete("/api/dossiers/{dossier_id}", status_code=204)
+def retirer_dossier(dossier_id: int) -> None:
+    """Supprime un dossier; ses discussions restent visibles sans dossier."""
+    if not supprimer_dossier(dossier_id):
+        raise HTTPException(status_code=404, detail="Dossier introuvable.")
+
+
+@app.post("/api/discussions", status_code=201)
+def nouvelle_discussion(body: NouvelleDiscussion) -> dict:
+    """Crée une discussion partagée, éventuellement dans un dossier."""
+    try:
+        return creer_discussion(body.dossier_id)
+    except LookupError as erreur:
+        raise HTTPException(status_code=404, detail=str(erreur)) from erreur
+
+
+@app.get("/api/discussions/{discussion_id}")
+def charger_discussion(discussion_id: str) -> dict:
+    """Charge les messages et sources d'une discussion partagée."""
+    discussion = obtenir_discussion(discussion_id)
+    if discussion is None:
+        raise HTTPException(status_code=404, detail="Discussion introuvable.")
+    return discussion
+
+
+@app.patch("/api/discussions/{discussion_id}/dossier")
+def ranger_discussion(discussion_id: str, body: DeplacementDiscussion) -> dict:
+    """Déplace une discussion vers un autre dossier ou la retire d'un dossier."""
+    try:
+        modifiee = deplacer_discussion(discussion_id, body.dossier_id)
+    except LookupError as erreur:
+        raise HTTPException(status_code=404, detail=str(erreur)) from erreur
+    if not modifiee:
+        raise HTTPException(status_code=404, detail="Discussion introuvable.")
+    return {"id": discussion_id, "dossier_id": body.dossier_id}
+
+
+@app.delete("/api/discussions/{discussion_id}", status_code=204)
+def retirer_discussion(discussion_id: str) -> None:
+    """Supprime une discussion et les messages qu'elle contient."""
+    if not supprimer_discussion(discussion_id):
+        raise HTTPException(status_code=404, detail="Discussion introuvable.")
+
+
 @app.post("/ask", response_model=Reponse)
 def ask(body: Question) -> dict:
-    """Répond à une question avec des sources issues des PDF indexés."""
+    """Répond avec les PDF indexés et, si demandé, des sources web."""
     if not body.question.strip():
         raise HTTPException(status_code=422, detail="La question ne peut pas être vide.")
     try:
-        historique = [
-            {"role": message.role, "content": message.content}
-            for message in body.historique
-        ]
-        return repondre(body.question, historique=historique)
+        if body.conversation_id:
+            historique = historique_persistant(body.conversation_id)
+            if historique is None:
+                raise HTTPException(status_code=404, detail="Discussion introuvable.")
+        else:
+            historique = [
+                {"role": message.role, "content": message.content}
+                for message in body.historique
+            ]
+        question_recherche_web = body.question
+        if len(body.question.split()) <= 5 and historique:
+            derniere_question = next(
+                (message["content"] for message in reversed(historique)
+                 if message.get("role") == "user"),
+                "",
+            )
+            if derniere_question:
+                question_recherche_web = f"{derniere_question} — question de suivi : {body.question}"
+        sources_web = rechercher(question_recherche_web) if (
+            body.rechercher_sur_web and recherche_web_disponible()
+        ) else []
+        resultat = repondre(
+            body.question,
+            historique=historique,
+            sources_web=sources_web,
+        )
+        if body.conversation_id:
+            enregistrer_tour(
+                body.conversation_id,
+                body.question.strip(),
+                resultat["reponse"],
+                resultat["sources"],
+            )
+        return resultat
     except requests.Timeout as erreur:
         raise HTTPException(
             status_code=504,

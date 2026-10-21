@@ -56,7 +56,7 @@ catch {
 
 Write-Host ""
 Write-Host "Adresse à ouvrir sur les appareils du même Wi-Fi :" -ForegroundColor Cyan
-Write-Host "http://${AdresseIPv4}:8000/?v=tyson-ai-v1" -ForegroundColor White
+Write-Host "http://${AdresseIPv4}:8000/?v=tyson-ai-v2" -ForegroundColor White
 Write-Host "Les PDF importés seront enregistrés sur cet ordinateur et partagés par le chatbot."
 Write-Host "Garde cette fenêtre ouverte pendant l'essai. Pour arrêter le serveur : Ctrl+C."
 Write-Host ""
