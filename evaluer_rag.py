@@ -5,7 +5,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
-from rag import obtenir_collection
+from rag import obtenir_collection, retrouver
 
 
 DOSSIER = Path(__file__).resolve().parent
@@ -54,23 +54,13 @@ def main() -> int:
         return 1
 
     maximum_k = max(VALEURS_K)
-    resultat_recherche = collection.query(
-        query_texts=[element["question"] for element in questions],
-        n_results=min(maximum_k, nombre_chunks),
-        include=["documents", "metadatas"],
-    )
-    documents_trouves = resultat_recherche.get("documents") or []
-    metadonnees_trouvees = resultat_recherche.get("metadatas") or []
+    passages_par_question = [
+        retrouver(element["question"], k=maximum_k) for element in questions
+    ]
 
     observations: list[dict[str, Any]] = []
     for index, element in enumerate(questions):
-        textes = documents_trouves[index] if index < len(documents_trouves) else []
-        metas = metadonnees_trouvees[index] if index < len(metadonnees_trouvees) else []
-        extraits = [
-            (texte, meta)
-            for texte, meta in zip(textes, metas)
-            if texte and meta
-        ]
+        extraits = passages_par_question[index]
         pages_attendues = set(element["pages_attendues"])
         mesures: dict[int, tuple[float, float, float]] = {}
 

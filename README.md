@@ -15,15 +15,18 @@ réponse.
 
 L'application s'appelle **Tyson AI** et son interface affiche sa création par
 Tyson. Le prompt de comportement porte l'identifiant
-`VERSION_PROMPT = "tuteur-pedagogique-v1-by-tyson"` dans `rag.py` : il sert à
+`VERSION_PROMPT = "tuteur-pedagogique-v2-by-tyson"` dans `rag.py` : il sert à
 repérer la version du tuteur et fait partie de la clé du cache. Quand les
-consignes du tuteur changent de façon importante, incrémente cette version pour
-éviter de réutiliser les réponses produites par une ancienne version.
+consignes ou la stratégie de recherche changent de façon importante, incrémente
+cette version pour éviter de réutiliser les réponses produites par une ancienne
+version.
 
-Le tuteur n'a pas été réentraîné sur un domaine. Avec le RAG, son sujet dépend des
-PDF ajoutés : le cours de départ porte sur l'IA pour développeurs. Pour le
-spécialiser dans une autre matière, ajoute des supports de cours de cette matière
-et des questions de référence pour évaluer ses réponses.
+Le tuteur n'a pas été réentraîné sur un domaine. Ses capacités sont renforcées par
+le RAG : une recherche sémantique trouve des passages proches par le sens, puis
+un classement BM25 tient compte des termes exacts et diversifie les pages
+sélectionnées. Le sujet traité dépend des PDF ajoutés. Pour travailler une autre
+matière, ajoute ses supports et des questions de référence pour évaluer ses
+réponses.
 
 ## Fonctionnement
 
@@ -45,7 +48,7 @@ propres documents dans `documents/`.
 | Fichier ou dossier | Rôle dans le projet |
 | --- | --- |
 | `main.py` | API FastAPI et interface web : `POST /ask` répond aux questions, `POST /documents` reçoit un PDF (20 Mo maximum), détecte les copies exactes et l'indexe. |
-| `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, le stocke dans ChromaDB, retrouve les passages, prépare les sources et gère le cache des réponses. |
+| `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, les stocke dans ChromaDB, récupère jusqu'à 24 candidats et les reclasse avec recherche sémantique, BM25 et diversité des pages ; prépare les sources et gère le cache des réponses. |
 | `llm.py` | Envoie les passages à Ollama, demande une réponse JSON concise et vérifie que le JSON reçu est valide. |
 | `static/index.html` | Structure de la page du chat, de la zone de saisie et du bouton d'ajout PDF. |
 | `static/style.css` | Apparence de l'interface et adaptation aux petits écrans. |
@@ -75,6 +78,15 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
   des exemples tirés des supports et des sources vérifiables.
 - `rag.py` : identification de la version du prompt pédagogique sous le nom Tyson ;
   cet identifiant permet aussi de renouveler le cache lorsque le prompt évolue.
+- `rag.py` : recherche élargie à 24 passages candidats au maximum, reclassement
+  hybride sémantique et BM25 pour mieux retrouver les termes exacts, sélection
+  jusqu'à trois passages issus de pages différentes, et meilleur ciblage des
+  questions de suivi courtes.
+- `rag.py` : consignes pédagogiques enrichies pour définir les termes, expliquer
+  les notions avec des exemples issus des supports et guider les exercices par
+  étapes ; version du prompt passée à `tuteur-pedagogique-v2-by-tyson`.
+- `evaluer_rag.py` : l'évaluation utilise maintenant le même reclassement hybride
+  que le chatbot afin de mesurer le parcours réellement utilisé.
 - `main.py`, `static/index.html`, `static/style.css` et `static/tyson-logo.svg` :
   personnalisation du nom Tyson AI, ajout de la signature dans l'interface,
   création d'un logo original et nouvelle palette vert canard, avec mise en page
