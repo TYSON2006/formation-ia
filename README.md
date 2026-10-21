@@ -32,7 +32,7 @@ des URL retournés par Tavily ; le modèle ne fabrique pas les liens.
 ## Fonctionnement
 
 1. `rag.py` extrait le texte des PDF, le découpe et sauvegarde les embeddings
-   dans `index/` avec ChromaDB.
+   dans `index/chroma/` avec ChromaDB, séparément des bases SQLite.
 2. À chaque question, ChromaDB retrouve des passages pertinents.
 3. `recherche_web.py` peut compléter ces passages avec des résultats web facultatifs.
 4. `llm.py` envoie le contexte à Ollama et valide la réponse JSON.
@@ -58,7 +58,7 @@ propres documents dans `documents/`.
 | `static/style.css` | Apparence du chat et des espaces partagés, avec une barre latérale adaptée aux téléphones. |
 | `static/app.js` | Navigation dans les dossiers, création/reprise des discussions, envoi des questions et PDF, affichage des sources PDF ou web et accueil variable. |
 | `documents/` | PDF locaux à indexer. Les fichiers PDF sont ignorés par Git et ne sont donc pas publiés. |
-| `index/` | Base ChromaDB et cache SQLite des réponses créés localement ; ils sont régénérables et ignorés par Git. |
+| `index/` | Index vectoriel ChromaDB (`chroma/`), cache des réponses et données des discussions, tous locaux et ignorés par Git. |
 | `evaluation/questions.json` | Questions de référence, réponses attendues et pages à retrouver dans le cours d'introduction à l'IA. |
 | `evaluer_rag.py` | Mesure si les bonnes pages sont retrouvées avec `k = 1, 2, 4, 6`. Le script n'appelle pas Ollama. |
 | `requirements.txt` | Dépendances Python nécessaires au projet. |

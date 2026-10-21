@@ -27,6 +27,7 @@ from llm import MODEL, appeler_llm
 
 DOSSIER_DOCUMENTS = DOSSIER / "documents"
 DOSSIER_INDEX = DOSSIER / "index"
+DOSSIER_CHROMA = DOSSIER_INDEX / "chroma"
 MODELE_EMBEDDING = "paraphrase-multilingual-MiniLM-L12-v2"
 TAILLE_CHUNK = 350
 CHEVAUCHEMENT = 50
@@ -146,7 +147,7 @@ def enregistrer_cache_reponse(cle: str, resultat: dict[str, Any]) -> None:
 @lru_cache(maxsize=1)
 def obtenir_collection() -> Any:
     """Ouvre la base persistante et charge le modèle d'embedding une seule fois."""
-    client = chromadb.PersistentClient(path=str(DOSSIER_INDEX))
+    client = chromadb.PersistentClient(path=str(DOSSIER_CHROMA))
     embedding = SentenceTransformerEmbeddingFunction(model_name=MODELE_EMBEDDING)
     return client.get_or_create_collection(
         name="documents",
