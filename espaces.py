@@ -1,4 +1,4 @@
-"""Stockage SQLite des dossiers partagés et des discussions."""
+"""Stockage SQLite des comptes, sessions, réponses et espaces partagés."""
 
 import json
 import sqlite3
@@ -52,12 +52,132 @@ def initialiser() -> None:
                 sources TEXT NOT NULL DEFAULT '[]',
                 cree_le REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS utilisateurs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom_utilisateur TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                sel_mot_de_passe TEXT NOT NULL,
+                empreinte_mot_de_passe TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('admin', 'membre')),
+                cree_le REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                empreinte_jeton TEXT PRIMARY KEY,
+                utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+                expire_le REAL NOT NULL,
+                cree_le REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_sessions_expiration ON sessions(expire_le);
+            CREATE TABLE IF NOT EXISTS journal_reponses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+                discussion_id TEXT,
+                statut TEXT NOT NULL CHECK (statut IN ('reussite', 'echec')),
+                duree_ms INTEGER NOT NULL,
+                code_erreur TEXT,
+                sources_pdf INTEGER NOT NULL DEFAULT 0,
+                sources_web INTEGER NOT NULL DEFAULT 0,
+                cree_le REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_journal_reponses_date
+                ON journal_reponses(cree_le DESC);
             CREATE INDEX IF NOT EXISTS idx_discussions_dossier_modifie
                 ON discussions(dossier_id, modifie_le DESC);
             CREATE INDEX IF NOT EXISTS idx_messages_discussion
                 ON messages(discussion_id, id);
             """
         )
+
+
+def creer_utilisateur(nom_utilisateur: str, sel: str, empreinte: str) -> dict[str, Any]:
+    """Crée le premier compte comme administrateur, puis des comptes membres."""
+    with connecter() as connexion:
+        # Sérialise l'attribution du premier rôle admin en cas d'inscriptions
+        # simultanées : un seul compte peut devenir le premier.
+        connexion.execute("BEGIN IMMEDIATE")
+        role = "admin" if connexion.execute(
+            "SELECT 1 FROM utilisateurs LIMIT 1"
+        ).fetchone() is None else "membre"
+        curseur = connexion.execute(
+            "INSERT INTO utilisateurs "
+            "(nom_utilisateur, sel_mot_de_passe, empreinte_mot_de_passe, role, cree_le) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (nom_utilisateur, sel, empreinte, role, time.time()),
+        )
+        ligne = connexion.execute(
+            "SELECT id, nom_utilisateur, role, cree_le FROM utilisateurs WHERE id = ?",
+            (curseur.lastrowid,),
+        ).fetchone()
+    return dict(ligne)
+
+
+def obtenir_utilisateur(nom_utilisateur: str) -> dict[str, Any] | None:
+    with connecter() as connexion:
+        ligne = connexion.execute(
+            "SELECT id, nom_utilisateur, sel_mot_de_passe, empreinte_mot_de_passe, "
+            "role, cree_le FROM utilisateurs WHERE nom_utilisateur = ?",
+            (nom_utilisateur,),
+        ).fetchone()
+    return dict(ligne) if ligne else None
+
+
+def creer_session(empreinte_jeton: str, utilisateur_id: int, expire_le: float) -> None:
+    maintenant = time.time()
+    with connecter() as connexion:
+        connexion.execute("DELETE FROM sessions WHERE expire_le <= ?", (maintenant,))
+        connexion.execute(
+            "INSERT INTO sessions (empreinte_jeton, utilisateur_id, expire_le, cree_le) "
+            "VALUES (?, ?, ?, ?)",
+            (empreinte_jeton, utilisateur_id, expire_le, maintenant),
+        )
+
+
+def obtenir_utilisateur_session(empreinte_jeton: str) -> dict[str, Any] | None:
+    with connecter() as connexion:
+        ligne = connexion.execute(
+            "SELECT u.id, u.nom_utilisateur, u.role, u.cree_le "
+            "FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id "
+            "WHERE s.empreinte_jeton = ? AND s.expire_le > ?",
+            (empreinte_jeton, time.time()),
+        ).fetchone()
+    return dict(ligne) if ligne else None
+
+
+def supprimer_session(empreinte_jeton: str) -> None:
+    with connecter() as connexion:
+        connexion.execute(
+            "DELETE FROM sessions WHERE empreinte_jeton = ?", (empreinte_jeton,)
+        )
+
+
+def enregistrer_evenement_reponse(
+    utilisateur_id: int,
+    discussion_id: str | None,
+    statut: str,
+    duree_ms: int,
+    code_erreur: str | None,
+    sources_pdf: int,
+    sources_web: int,
+) -> None:
+    with connecter() as connexion:
+        connexion.execute(
+            "INSERT INTO journal_reponses "
+            "(utilisateur_id, discussion_id, statut, duree_ms, code_erreur, "
+            "sources_pdf, sources_web, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (utilisateur_id, discussion_id, statut, duree_ms, code_erreur,
+             sources_pdf, sources_web, time.time()),
+        )
+
+
+def lister_journal_reponses(limite: int = 100) -> list[dict[str, Any]]:
+    with connecter() as connexion:
+        lignes = connexion.execute(
+            "SELECT j.id, u.nom_utilisateur, j.discussion_id, j.statut, j.duree_ms, "
+            "j.code_erreur, j.sources_pdf, j.sources_web, j.cree_le "
+            "FROM journal_reponses j JOIN utilisateurs u ON u.id = j.utilisateur_id "
+            "ORDER BY j.cree_le DESC LIMIT ?",
+            (limite,),
+        ).fetchall()
+    return [dict(ligne) for ligne in lignes]
 
 
 def creer_dossier(nom: str) -> dict[str, Any]:

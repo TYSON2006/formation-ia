@@ -32,6 +32,25 @@ button { color: inherit; }
   min-height: 100vh;
   flex-direction: column;
 }
+[hidden] { display: none !important; }
+
+.auth-screen { display: flex; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 28px 18px; background: radial-gradient(ellipse at 50% 15%, #e0f1eb 0, #f3f7f6 48%, #f3f7f6 100%); }
+.auth-brand { margin-bottom: 25px; }
+.auth-card { width: min(100%, 410px); padding: 31px; border: 1px solid #e0eae6; border-radius: 20px; background: rgba(255,255,255,.96); box-shadow: 0 22px 65px rgba(28,69,60,.09); }
+.auth-card h1 { font-size: 23px; }
+.auth-description { margin: 9px 0 23px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.auth-card label { display: block; margin: 14px 0 6px; color: #566964; font-size: 11px; font-weight: 650; }
+.auth-card input { width: 100%; min-height: 43px; padding: 10px 12px; border: 1px solid #dce8e3; border-radius: 10px; outline: none; background: #fff; color: var(--ink); font: inherit; font-size: 13px; }
+.auth-card input:focus { border-color: #91c9bb; box-shadow: 0 0 0 3px rgba(19,124,114,.09); }
+.auth-message { min-height: 19px; margin: 9px 0 3px; color: #b13e4a; font-size: 11px; line-height: 1.5; }
+.auth-submit { width: 100%; min-height: 43px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.auth-submit:hover:not(:disabled) { background: var(--brand-dark); }
+.auth-submit:disabled { cursor: wait; opacity: .6; }
+.auth-switch-line { margin: 17px 0 0; color: var(--muted); font-size: 11px; text-align: center; }
+.text-button { padding: 0 2px; border: 0; background: none; color: var(--brand-dark); cursor: pointer; font: inherit; font-weight: 700; }
+.text-button:hover { text-decoration: underline; }
+.auth-first-account { margin: 16px 0 0; padding: 10px 12px; border-radius: 9px; background: #f1f8f5; color: #55756b; font-size: 10px; line-height: 1.5; }
+.auth-footer { max-width: 420px; margin: 17px 0 0; color: #8b9a95; font-size: 10px; line-height: 1.5; text-align: center; }
 
 .topbar {
   display: flex;
@@ -52,6 +71,9 @@ button { color: inherit; }
 .brand-name span { color: var(--brand); }
 .brand-tagline { color: #758980; font-size: 8px; font-weight: 700; letter-spacing: 1.1px; }
 .topbar-actions { gap: 24px; }
+.account-name { color: #536b64; font-size: 11px; font-weight: 650; }
+.quiet-button { min-height: 34px; padding: 0 10px; border: 1px solid #dfe9e5; border-radius: 9px; background: #fff; color: #536b64; cursor: pointer; font: inherit; font-size: 10px; font-weight: 650; }
+.quiet-button:hover { border-color: #a9d4c9; background: #f4fbf8; color: var(--brand-dark); }
 .connection-state { gap: 8px; color: #6c6e81; font-size: 12px; }
 .connection-dot { width: 7px; height: 7px; border-radius: 50%; background: #39b987; box-shadow: 0 0 0 3px #e4f7ef; }
 .connection-state.is-loading .connection-dot { background: #e1a236; box-shadow: 0 0 0 3px #fff3da; animation: pulse 1.3s ease-in-out infinite; }
@@ -162,6 +184,21 @@ kbd { padding: 2px 4px; border: 1px solid #e8e8ee; border-radius: 4px; backgroun
 .footer-separator { padding: 0 3px; color: #a2b4ad; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
+.journal-dialog { width: min(760px, calc(100% - 24px)); max-height: min(80vh, 720px); padding: 0; overflow: hidden; border: 1px solid #dce8e3; border-radius: 17px; background: #fff; color: var(--ink); box-shadow: 0 25px 80px rgba(16,48,41,.22); }
+.journal-dialog::backdrop { background: rgba(20,43,38,.38); backdrop-filter: blur(3px); }
+.journal-heading { display: flex; align-items: center; justify-content: space-between; padding: 19px 22px 13px; border-bottom: 1px solid #edf2ef; }
+.journal-heading .eyebrow { margin-bottom: 4px; }
+.journal-heading h2 { margin: 0; font: 800 19px "Segoe UI", Arial, sans-serif; letter-spacing: -.4px; }
+.journal-note { margin: 12px 22px; color: #82908c; font-size: 10px; line-height: 1.5; }
+.journal-table-wrap { max-height: 53vh; overflow: auto; padding: 0 22px 15px; }
+.journal-table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; }
+.journal-table th { position: sticky; top: 0; padding: 9px 7px; background: #f6faf8; color: #6c8179; font-size: 9px; font-weight: 700; }
+.journal-table td { padding: 9px 7px; border-bottom: 1px solid #edf2ef; color: #53656a; vertical-align: top; }
+.journal-result-success { color: #17765f !important; font-weight: 700; }
+.journal-result-failure { color: #b13e4a !important; font-weight: 700; }
+.journal-empty, .journal-error { padding: 16px 7px; color: #8b9a95; font-size: 11px; }
+.journal-error { margin: 0 22px 13px; color: #b13e4a; }
+
 @keyframes arrive { from { transform: translateY(5px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .55; } 30% { transform: translateY(-4px); opacity: 1; } }
 @keyframes pulse { 50% { opacity: .55; } }
@@ -172,11 +209,16 @@ kbd { padding: 2px 4px; border: 1px solid #e8e8ee; border-radius: 4px; backgroun
   .brand-name { font-size: 14px; }
   .brand-tagline { font-size: 7px; }
   .topbar-actions { gap: 12px; }
+  .account-name { display: none; }
+  .quiet-button { width: 32px; min-height: 32px; padding: 0; font-size: 0; }
+  #open-journal::before { content: "▤"; font-size: 14px; }
+  #logout::before { content: "↪"; font-size: 16px; }
   .sidebar-toggle { display: grid; }
   .connection-state { font-size: 0; }
   .connection-dot { width: 8px; height: 8px; }
   .new-chat-button { width: 36px; min-height: 36px; justify-content: center; padding: 0; font-size: 0; }
   .new-chat-button span { font-size: 19px; }
+  .auth-card { padding: 25px 21px; }
   .workspace-layout { min-height: 0; padding: 12px 10px 8px; }
   .workspace-sidebar { display: none; position: absolute; z-index: 5; inset: 10px auto 10px 10px; width: min(300px, calc(100% - 20px)); box-shadow: 0 18px 55px rgba(20, 54, 48, .2); }
   .workspace-sidebar.is-open { display: flex; }
@@ -196,6 +238,10 @@ kbd { padding: 2px 4px; border: 1px solid #e8e8ee; border-radius: 4px; backgroun
   .web-search-option { flex-wrap: wrap; }
   .web-search-status { width: 100%; text-align: center; }
   .page-footer { min-height: 34px; font-size: 9px; }
+  .journal-heading { padding: 16px; }
+  .journal-note { margin: 10px 16px; }
+  .journal-table-wrap { padding: 0 12px 12px; }
+  .journal-table th, .journal-table td { padding: 8px 5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

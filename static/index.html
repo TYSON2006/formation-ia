@@ -6,11 +6,37 @@
     <meta name="theme-color" content="#f3f7f6">
     <meta name="description" content="Tyson AI, un tuteur pédagogique pour comprendre tes supports de cours.">
     <title>Tyson AI — Tuteur pédagogique</title>
-    <link rel="stylesheet" href="/static/style.css?v=tyson-ai-v2">
-    <script src="/static/app.js?v=tyson-ai-v2" defer></script>
+    <link rel="stylesheet" href="/static/style.css?v=tyson-ai-v3-auth">
+    <script src="/static/app.js?v=tyson-ai-v3-auth" defer></script>
   </head>
   <body>
-    <div class="app-shell">
+    <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title" hidden>
+      <a class="brand auth-brand" href="/" aria-label="Tyson AI, accueil">
+        <img class="brand-logo" src="/static/tyson-logo.svg?v=tyson-ai-v2" alt="">
+        <span class="brand-copy">
+          <span class="brand-name">Tyson <span>AI</span></span>
+          <span class="brand-tagline">TUTEUR PÉDAGOGIQUE</span>
+        </span>
+      </a>
+      <form class="auth-card" id="auth-form">
+        <p class="eyebrow">ESPACE D’APPRENTISSAGE</p>
+        <h1 id="auth-title">Content de te revoir.</h1>
+        <p class="auth-description" id="auth-description">Connecte-toi pour retrouver les dossiers et discussions partagés.</p>
+        <label for="auth-username">Nom d’utilisateur</label>
+        <input id="auth-username" name="nom_utilisateur" type="text" minlength="3" maxlength="32" pattern="[A-Za-z0-9_-]+" autocomplete="username" required>
+        <label for="auth-password">Mot de passe</label>
+        <input id="auth-password" name="mot_de_passe" type="password" minlength="10" maxlength="128" autocomplete="current-password" required>
+        <p class="auth-message" id="auth-message" role="status" aria-live="polite"></p>
+        <button class="auth-submit" id="auth-submit" type="submit">Se connecter</button>
+        <p class="auth-switch-line"><span id="auth-switch-prompt">Pas encore de compte ?</span>
+          <button id="auth-switch" class="text-button" type="button">Créer un compte</button>
+        </p>
+        <p class="auth-first-account" id="auth-first-account" hidden>Le premier compte créé sera administrateur. Les suivants seront membres.</p>
+      </form>
+      <p class="auth-footer">Les dossiers et les discussions sont communs à tous les comptes de ce serveur.</p>
+    </section>
+
+    <div class="app-shell" id="app-shell" hidden>
       <header class="topbar">
         <a class="brand" href="/" aria-label="Tyson AI, accueil">
           <img class="brand-logo" src="/static/tyson-logo.svg?v=tyson-ai-v2" alt="">
@@ -30,6 +56,9 @@
             <span aria-hidden="true">＋</span>
             Nouvelle discussion
           </button>
+          <span class="account-name" id="account-name"></span>
+          <button class="quiet-button" id="open-journal" type="button" hidden>Journal</button>
+          <button class="quiet-button" id="logout" type="button">Déconnexion</button>
         </div>
       </header>
 
@@ -121,5 +150,24 @@
         Créé par <strong>Tyson</strong><span class="footer-separator">·</span>Réponses générées en local avec Ollama
       </footer>
     </div>
+
+    <dialog class="journal-dialog" id="journal-dialog" aria-labelledby="journal-title">
+      <div class="journal-heading">
+        <div>
+          <p class="eyebrow">ADMINISTRATION</p>
+          <h2 id="journal-title">Journal des réponses</h2>
+        </div>
+        <button class="small-action" id="close-journal" type="button" aria-label="Fermer le journal">×</button>
+      </div>
+      <p class="journal-note">Le journal conserve le statut, la durée et les sources. Il n’enregistre pas le texte des questions ni des réponses.</p>
+      <div class="journal-table-wrap">
+        <table class="journal-table">
+          <thead><tr><th>Date</th><th>Compte</th><th>Résultat</th><th>Code</th><th>Durée</th><th>Sources</th></tr></thead>
+          <tbody id="journal-rows"></tbody>
+        </table>
+        <p class="journal-empty" id="journal-empty" hidden>Aucune réponse enregistrée pour l’instant.</p>
+      </div>
+      <p class="journal-error" id="journal-error" role="status" aria-live="polite"></p>
+    </dialog>
   </body>
 </html>

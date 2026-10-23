@@ -18,12 +18,34 @@ const webSearchToggle = document.querySelector("#web-search");
 const webSearchStatus = document.querySelector("#web-search-status");
 const status = document.querySelector(".connection-state");
 const statusText = document.querySelector("#status-text");
+const authScreen = document.querySelector("#auth-screen");
+const appShell = document.querySelector("#app-shell");
+const authForm = document.querySelector("#auth-form");
+const authUsername = document.querySelector("#auth-username");
+const authPassword = document.querySelector("#auth-password");
+const authTitle = document.querySelector("#auth-title");
+const authDescription = document.querySelector("#auth-description");
+const authMessage = document.querySelector("#auth-message");
+const authSubmit = document.querySelector("#auth-submit");
+const authSwitch = document.querySelector("#auth-switch");
+const authSwitchPrompt = document.querySelector("#auth-switch-prompt");
+const authFirstAccount = document.querySelector("#auth-first-account");
+const accountName = document.querySelector("#account-name");
+const logoutButton = document.querySelector("#logout");
+const openJournalButton = document.querySelector("#open-journal");
+const journalDialog = document.querySelector("#journal-dialog");
+const closeJournalButton = document.querySelector("#close-journal");
+const journalRows = document.querySelector("#journal-rows");
+const journalEmpty = document.querySelector("#journal-empty");
+const journalError = document.querySelector("#journal-error");
 
 let historique = [];
 let requestEnCours = false;
 let espacePartage = { dossiers: [], sans_dossier: [] };
 let filtreDossier = "tous";
 let discussionActive = null;
+let modeAuthentification = "login";
+let utilisateurActuel = null;
 
 function afficherAccueilAleatoire() {
   const accueils = [
@@ -47,7 +69,10 @@ function afficherAccueilAleatoire() {
     .map((_, index) => index)
     .filter((index) => index !== dernierIndex);
   const nouvelIndex = choixPossibles[Math.floor(Math.random() * choixPossibles.length)];
-  welcomeTitle.textContent = accueils[nouvelIndex];
+  const nomAgent = utilisateurActuel?.nom_utilisateur || "X";
+  welcomeTitle.textContent = accueils[nouvelIndex]
+    .replaceAll("agent X", `agent ${nomAgent}`)
+    .replaceAll("Agent X", `Agent ${nomAgent}`);
 
   try {
     localStorage.setItem("tyson-ai-accueil-index", String(nouvelIndex));
@@ -55,8 +80,6 @@ function afficherAccueilAleatoire() {
     // L’accueil reste aléatoire même si le navigateur refuse de mémoriser le choix.
   }
 }
-
-afficherAccueilAleatoire();
 
 function mettreAJourBoutons() {
   sendButton.disabled = requestEnCours || !questionField.value.trim();
@@ -77,9 +100,60 @@ async function appelerAPI(url, options = {}) {
   const response = await fetch(url, options);
   const resultat = response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && !url.startsWith("/api/auth/")) {
+      afficherEcranConnexion("Ta session a expiré. Connecte-toi à nouveau.");
+    }
     throw new Error(typeof resultat.detail === "string" ? resultat.detail : "La demande n'a pas abouti.");
   }
   return resultat;
+}
+
+function afficherEcranConnexion(message = "") {
+  utilisateurActuel = null;
+  appShell.hidden = true;
+  authScreen.hidden = false;
+  authMessage.textContent = message;
+  authUsername.focus();
+}
+
+async function afficherApplication(utilisateur) {
+  utilisateurActuel = utilisateur;
+  accountName.textContent = utilisateur.nom_utilisateur;
+  openJournalButton.hidden = utilisateur.role !== "admin";
+  authScreen.hidden = true;
+  appShell.hidden = false;
+  afficherAccueilAleatoire();
+
+  try {
+    await actualiserEspace();
+  } catch (erreur) {
+    afficherStatut(`Les dossiers partagés ne sont pas disponibles : ${erreur.message}`, "error");
+  }
+
+  try {
+    const configuration = await appelerAPI("/api/config");
+    webSearchToggle.disabled = !configuration.recherche_web_disponible;
+    webSearchToggle.checked = configuration.recherche_web_disponible;
+    webSearchStatus.textContent = configuration.recherche_web_disponible
+      ? "Tavily actif · une recherche par question"
+      : "Clé TAVILY_API_KEY requise dans .env";
+  } catch {
+    webSearchStatus.textContent = "Recherche web indisponible";
+  }
+}
+
+function mettreAJourModeAuthentification() {
+  const inscription = modeAuthentification === "register";
+  authTitle.textContent = inscription ? "Créer ton compte." : "Content de te revoir.";
+  authDescription.textContent = inscription
+    ? "Choisis un nom d’utilisateur et un mot de passe pour rejoindre l’espace partagé."
+    : "Connecte-toi pour retrouver les dossiers et discussions partagés.";
+  authSubmit.textContent = inscription ? "Créer mon compte" : "Se connecter";
+  authSwitchPrompt.textContent = inscription ? "Tu as déjà un compte ?" : "Pas encore de compte ?";
+  authSwitch.textContent = inscription ? "Se connecter" : "Créer un compte";
+  authFirstAccount.hidden = !inscription;
+  authPassword.autocomplete = inscription ? "new-password" : "current-password";
+  authMessage.textContent = "";
 }
 
 function fermerMenuMobile() {
@@ -465,16 +539,106 @@ sidebarToggle.addEventListener("click", () => {
   sidebarToggle.setAttribute("aria-expanded", String(ouvert));
 });
 
-actualiserEspace().catch((erreur) => {
-  afficherStatut(`Les dossiers partagés ne sont pas disponibles : ${erreur.message}`, "error");
+authSwitch.addEventListener("click", () => {
+  modeAuthentification = modeAuthentification === "login" ? "register" : "login";
+  mettreAJourModeAuthentification();
 });
 
-appelerAPI("/api/config").then((configuration) => {
-  webSearchToggle.disabled = !configuration.recherche_web_disponible;
-  webSearchToggle.checked = configuration.recherche_web_disponible;
-  webSearchStatus.textContent = configuration.recherche_web_disponible
-    ? "Tavily actif · une recherche par question"
-    : "Clé TAVILY_API_KEY requise dans .env";
-}).catch(() => {
-  webSearchStatus.textContent = "Recherche web indisponible";
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  authSubmit.disabled = true;
+  authMessage.textContent = "";
+  const endpoint = modeAuthentification === "register" ? "/api/auth/register" : "/api/auth/login";
+  try {
+    const resultat = await appelerAPI(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nom_utilisateur: authUsername.value.trim(),
+        mot_de_passe: authPassword.value,
+      }),
+    });
+    authPassword.value = "";
+    await afficherApplication(resultat.utilisateur);
+  } catch (erreur) {
+    authMessage.textContent = erreur.message;
+  } finally {
+    authSubmit.disabled = false;
+  }
 });
+
+logoutButton.addEventListener("click", async () => {
+  try {
+    await appelerAPI("/api/auth/logout", { method: "POST" });
+  } catch {
+    // L'écran de connexion reste accessible même si la session a déjà expiré.
+  } finally {
+    authPassword.value = "";
+    modeAuthentification = "login";
+    mettreAJourModeAuthentification();
+    afficherEcranConnexion("Tu es déconnecté.");
+  }
+});
+
+async function chargerJournal() {
+  journalError.textContent = "";
+  journalRows.replaceChildren();
+  journalEmpty.hidden = true;
+  try {
+    const resultat = await appelerAPI("/api/admin/journal?limite=100");
+    const evenements = resultat.evenements ?? [];
+    journalEmpty.hidden = evenements.length > 0;
+    for (const evenement of evenements) {
+      const ligne = document.createElement("tr");
+      const date = new Date(evenement.cree_le * 1000).toLocaleString("fr-FR");
+      const duree = evenement.duree_ms >= 1000
+        ? `${(evenement.duree_ms / 1000).toFixed(1)} s`
+        : `${evenement.duree_ms} ms`;
+      const sources = `${evenement.sources_pdf} PDF · ${evenement.sources_web} web`;
+      const valeurs = [
+        date,
+        evenement.nom_utilisateur,
+        evenement.statut === "reussite" ? "Réussie" : "Échec",
+        evenement.code_erreur ?? "—",
+        duree,
+        sources,
+      ];
+      for (const valeur of valeurs) {
+        const cellule = document.createElement("td");
+        cellule.textContent = String(valeur);
+        ligne.append(cellule);
+      }
+      const resultatCellule = ligne.children[2];
+      resultatCellule.className = evenement.statut === "reussite"
+        ? "journal-result-success"
+        : "journal-result-failure";
+      journalRows.append(ligne);
+    }
+  } catch (erreur) {
+    journalError.textContent = erreur.message;
+  }
+}
+
+openJournalButton.addEventListener("click", async () => {
+  journalDialog.showModal();
+  await chargerJournal();
+});
+
+closeJournalButton.addEventListener("click", () => journalDialog.close());
+journalDialog.addEventListener("click", (event) => {
+  if (event.target === journalDialog) journalDialog.close();
+});
+
+async function demarrerInterface() {
+  try {
+    const resultat = await appelerAPI("/api/auth/me");
+    await afficherApplication(resultat.utilisateur);
+  } catch (erreur) {
+    afficherEcranConnexion(erreur instanceof TypeError
+      ? "Impossible de joindre l’API. Vérifie que FastAPI est démarré."
+      : "Connecte-toi ou crée un compte pour continuer.");
+  }
+}
+
+mettreAJourModeAuthentification();
+demarrerInterface();

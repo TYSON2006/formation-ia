@@ -25,8 +25,8 @@ version.
 Le tuteur n'a pas été réentraîné sur un domaine. Ses capacités sont renforcées par
 le RAG : une recherche sémantique trouve des passages proches par le sens, puis
 un classement BM25 tient compte des termes exacts et diversifie les pages
-sélectionnées. Les dossiers et discussions sont partagés par tous les visiteurs
-du même serveur. Une recherche web facultative fournit au modèle des extraits et
+sélectionnées. Les comptes sont personnels, tandis que les dossiers et discussions
+restent partagés par les membres du même serveur. Une recherche web facultative fournit au modèle des extraits et
 des URL retournés par Tavily ; le modèle ne fabrique pas les liens.
 
 ## Fonctionnement
@@ -36,8 +36,10 @@ des URL retournés par Tavily ; le modèle ne fabrique pas les liens.
 2. À chaque question, ChromaDB retrouve des passages pertinents.
 3. `recherche_web.py` peut compléter ces passages avec des résultats web facultatifs.
 4. `llm.py` envoie le contexte à Ollama et valide la réponse JSON.
-5. `main.py` expose l'API du chat, des PDF, des dossiers et des discussions partagés.
-6. `espaces.py` conserve les dossiers, les discussions et les messages dans SQLite.
+5. `main.py` expose les routes de connexion et protège l'API du chat, des PDF,
+   des dossiers et des discussions.
+6. `espaces.py` conserve les comptes, les sessions, le journal des réponses, les
+   dossiers et les discussions dans SQLite.
 7. L'interface retrouve les conversations enregistrées et conserve leur historique
    pour les questions de suivi. L'accueil varie lors du rechargement de la page.
 
@@ -49,14 +51,14 @@ propres documents dans `documents/`.
 
 | Fichier ou dossier | Rôle dans le projet |
 | --- | --- |
-| `main.py` | API FastAPI : `POST /ask`, import de PDF, endpoints `/api/dossiers` et `/api/discussions`, configuration web et service des fichiers de l'interface. |
+| `main.py` | API FastAPI : inscription, connexion, sessions, journal administrateur, `POST /ask`, import de PDF, dossiers et discussions. |
 | `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, les stocke dans ChromaDB, récupère jusqu'à 24 candidats et les reclasse avec recherche sémantique, BM25 et diversité des pages ; prépare les sources et gère le cache des réponses. |
-| `espaces.py` | Enregistre dans SQLite les dossiers communs, les discussions, leurs messages et les sources ; permet de reprendre les conversations après un rechargement. |
+| `espaces.py` | Enregistre dans SQLite les comptes, sessions sécurisées, résultats des réponses, dossiers communs, discussions, messages et sources. |
 | `recherche_web.py` | Interroge Tavily avec une clé serveur facultative, limite les résultats transmis au modèle et écarte les URL non HTTP(S). |
 | `llm.py` | Envoie les passages à Ollama, demande une réponse JSON concise et vérifie que le JSON reçu est valide. |
-| `static/index.html` | Structure du chat, de la barre des dossiers, du bouton PDF et de l'option de recherche web. |
-| `static/style.css` | Apparence du chat et des espaces partagés, avec une barre latérale adaptée aux téléphones. |
-| `static/app.js` | Navigation dans les dossiers, création/reprise des discussions, envoi des questions et PDF, affichage des sources PDF ou web et accueil variable. |
+| `static/index.html` | Structure de la connexion, du chat, de la barre des dossiers et du journal administrateur. |
+| `static/style.css` | Apparence de la connexion, du chat et du journal, avec une barre latérale adaptée aux téléphones. |
+| `static/app.js` | Connexion/inscription, navigation partagée, envoi des questions et PDF, affichage des sources et du journal administrateur. |
 | `documents/` | PDF locaux à indexer. Les fichiers PDF sont ignorés par Git et ne sont donc pas publiés. |
 | `index/` | Index vectoriel ChromaDB (`chroma/`), cache des réponses et données des discussions, tous locaux et ignorés par Git. |
 | `evaluation/questions.json` | Questions de référence, réponses attendues et pages à retrouver dans le cours d'introduction à l'IA. |
@@ -124,6 +126,17 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
 - `recherche_web.py`, `rag.py`, `main.py`, `.env.example` : ajout d'une recherche
   web facultative avec Tavily et citations fondées sur les résultats retournés.
 - `README.md` : explication des dossiers partagés et configuration de Tavily.
+- `espaces.py` : ajout des tables SQLite pour les comptes, les sessions et le
+  journal des réponses. Ces tables sont créées sans supprimer les dossiers et
+  discussions déjà enregistrés.
+- `main.py` : ajout de l'inscription, de la connexion, de sessions par cookie,
+  de la protection des routes et du suivi des réponses réussies ou échouées.
+  Le journal stocke les durées, catégories d'erreur et nombres de sources, jamais
+  le texte des questions ou des réponses.
+- `static/index.html`, `static/style.css`, `static/app.js` : ajout de l'écran de
+  connexion, du formulaire d'inscription, de la déconnexion et du journal pour
+  l'administrateur.
+- `README.md` : instructions sur les comptes et le journal des réponses.
 
 `llm.py` appelle toujours Ollama et valide le JSON reçu. Les durées affichées par
 `rag.py` permettent de voir si l'attente vient surtout de la recherche ou de la
@@ -143,7 +156,7 @@ Copy-Item .env.example .env
 ```
 
 L'ordinateur hôte doit avoir Python et Ollama installés. Pour un essai familial
-sur le même Wi-Fi, les autres personnes n'ont besoin que d'un navigateur. Le
+sur le même Wi-Fi, les autres personnes ont besoin d'un navigateur et d'un compte. Le
 fichier `.env` est local et ne doit pas être envoyé sur GitHub.
 
 ## Préparation
@@ -174,6 +187,7 @@ OLLAMA_NUM_CTX=4096
 OLLAMA_NUM_PREDICT=160
 HF_HUB_OFFLINE=1
 TAVILY_API_KEY=
+COOKIE_SECURE=false
 ```
 
 Pour activer la recherche web, crée un compte Tavily, récupère ta clé API et
@@ -323,9 +337,10 @@ Les PDF ajoutés depuis un téléphone sont envoyés et enregistrés dans le dos
 utilisateurs du chatbot. Le serveur dépend de cet ordinateur : s'il se met en
 veille ou se déconnecte du Wi-Fi, le chatbot devient inaccessible. Pour un premier
 essai, posez les questions à tour de rôle afin de ne pas ralentir le modèle local.
-Les dossiers et discussions n'ont pas de compte utilisateur : toute personne qui
-accède à cette adresse locale peut les lire. Garde le serveur sur un réseau de
-confiance et ne l'expose pas directement à Internet.
+Chaque personne crée un compte. Le premier compte devient administrateur et les
+suivants deviennent membres ; crée ton compte avant de partager l'adresse. Les
+dossiers et discussions restent communs à tous les comptes. Garde le serveur sur
+un réseau de confiance et ne l'expose pas directement à Internet.
 
 ## Tester les dossiers partagés et les sources web
 
@@ -340,6 +355,26 @@ confiance et ne l'expose pas directement à Internet.
 5. Pour la recherche web, configure `TAVILY_API_KEY` dans `.env`, redémarre le
    serveur et vérifie que la case « Ajouter des sources web » est active.
    Pose une question factuelle, puis ouvre un lien affiché sous la réponse.
+
+## Créer les comptes et vérifier le journal
+
+1. Redémarre FastAPI après la mise à jour. Sur la page d'accueil, crée ton compte
+   avec un mot de passe d'au moins 10 caractères : le premier compte devient admin.
+2. Pour simuler un collègue, déconnecte-toi et crée un second compte. Il doit voir
+   les mêmes dossiers et discussions, mais pas le bouton **Journal**.
+3. Reconnecte-toi avec le compte admin, pose une question et ouvre **Journal**.
+   Une ligne doit afficher le compte, la réussite, la durée et les sources.
+4. Pour voir un échec enregistré, arrête Ollama temporairement, pose une question,
+   puis rouvre **Journal** : l'état doit être « Échec » avec un code d'erreur.
+   Redémarre Ollama après cet essai.
+
+L'inscription reste ouverte aux personnes qui ont accès au serveur. Sur le Wi-Fi,
+crée le compte administrateur avant de partager l'adresse. Les mots de passe sont
+stockés sous forme d'empreintes PBKDF2 avec sel individuel ; les sessions utilisent
+un cookie HttpOnly valable 30 jours. Le journal est réservé au premier compte
+administrateur et ne contient pas le contenu des échanges. Pour un hébergement
+HTTPS, active `COOKIE_SECURE=true` ; sur le Wi-Fi local en HTTP, garde le serveur
+sur un réseau de confiance.
 
 Les réponses sont gardées dans `index/reponses_cache.sqlite3` (au plus 500 entrées).
 Une réponse est réutilisée quand la question, l'historique pertinent, les passages
