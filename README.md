@@ -87,7 +87,8 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
   génération de QCM structurés jusqu'à huit questions, correction interactive, score,
   explications, sources et conservation du QCM quand la discussion est rouverte.
 - `llm.py` : budget de génération augmenté pour les QCM et message clair quand Ollama
-  renvoie un JSON incomplet.
+  renvoie un JSON incomplet ; `rag.py` demande automatiquement une seconde génération
+  si le JSON ou le nombre de questions ne respecte pas le format attendu.
 - `llm.py` : si l'API Ollama locale ne répond pas, recherche `ollama.exe`, lance
   `ollama serve` en tâche de fond et attend jusqu'à 30 secondes que l'API soit prête.
   `OLLAMA_START_TIMEOUT` permet d'ajuster cette attente. Le script familial indique
@@ -459,7 +460,7 @@ l'information et renvoie `"sources": []`.
   l'application Ollama manuellement et vérifie `http://127.0.0.1:11434/api/tags`.
 - Si Ollama ne trouve pas `llama3.2:3b`, télécharge-le avec la commande indiquée
   dans la section Préparation.
-- Si un QCM échoue parce qu'Ollama renvoie un JSON incomplet, demande moins de
-  questions ; les QCM sont générés avec un budget plus grand que les réponses ordinaires.
+- Si un QCM reste incomplet après la nouvelle tentative automatique, demande moins
+  de questions ; les QCM sont générés avec un budget supérieur aux réponses ordinaires.
 - Si ChromaDB signale `DLL load failed while importing chromadb_rust_bindings`,
   installe le Microsoft Visual C++ Redistributable x64, puis redémarre VS Code.
