@@ -10,7 +10,7 @@ import sqlite3
 import tempfile
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import requests
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
@@ -37,7 +37,14 @@ from espaces import (
     supprimer_dossier,
     supprimer_session,
 )
-from rag import DOSSIER_DOCUMENTS, indexer_pdf, repondre
+from rag import (
+    DOSSIER_DOCUMENTS,
+    REPONSE_SANS_SOURCE,
+    est_demande_qcm,
+    generer_qcm,
+    indexer_pdf,
+    repondre,
+)
 from recherche_web import recherche_web_disponible, rechercher
 
 
@@ -265,6 +272,7 @@ class Source(BaseModel):
 class Reponse(BaseModel):
     reponse: str
     sources: list[Source]
+    quiz: dict[str, Any] | None = None
 
 
 class Identifiants(BaseModel):
@@ -451,20 +459,46 @@ def ask(body: Question, utilisateur: dict = Depends(utilisateur_connecte)) -> di
             )
             if derniere_question:
                 question_recherche_web = f"{derniere_question} — question de suivi : {body.question}"
-        sources_web = rechercher(question_recherche_web) if (
-            body.rechercher_sur_web and recherche_web_disponible()
-        ) else []
-        resultat = repondre(
-            body.question,
-            historique=historique,
-            sources_web=sources_web,
-        )
+        web_autorise = body.rechercher_sur_web and recherche_web_disponible()
+        demande_qcm = est_demande_qcm(body.question)
+        if demande_qcm:
+            resultat = generer_qcm(body.question, historique=historique)
+        else:
+            resultat = repondre(body.question, historique=historique)
+
+        # Le web ne consomme des crédits que si les supports et le modèle
+        # n'ont pas fourni de réponse étayée.
+        if web_autorise and resultat["reponse"] == REPONSE_SANS_SOURCE:
+            sources_web = rechercher(question_recherche_web)
+            if sources_web:
+                if demande_qcm:
+                    resultat = generer_qcm(
+                        body.question,
+                        historique=historique,
+                        sources_web=sources_web,
+                    )
+                else:
+                    resultat = repondre(
+                        body.question,
+                        historique=historique,
+                        sources_web=sources_web,
+                    )
+                if resultat["reponse"] != REPONSE_SANS_SOURCE:
+                    introduction_web = (
+                        "Je n'ai pas trouvé de réponse dans tes cours ; j'ai donc consulté le web.\n\n"
+                    )
+                    if demande_qcm:
+                        introduction_web = (
+                            "Les cours ne contenaient pas assez d'éléments ; j'ai préparé ce QCM à partir du web.\n\n"
+                        )
+                    resultat["reponse"] = introduction_web + resultat["reponse"]
         if body.conversation_id:
             enregistrer_tour(
                 body.conversation_id,
                 body.question.strip(),
                 resultat["reponse"],
                 resultat["sources"],
+                quiz=resultat.get("quiz"),
             )
         sources_pdf = sum(1 for source in resultat.get("sources", []) if not source.get("url"))
         sources_web_comptees = sum(1 for source in resultat.get("sources", []) if source.get("url"))

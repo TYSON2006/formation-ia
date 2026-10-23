@@ -107,8 +107,14 @@ def _demarrer_ollama_local(url_tags: str) -> None:
         )
 
 
-def appeler_llm(system: str, user: str, temperature: float = 0.2) -> dict[str, Any]:
+def appeler_llm(
+    system: str,
+    user: str,
+    temperature: float = 0.2,
+    num_predict: int | None = None,
+) -> dict[str, Any]:
     """Envoie deux messages à Ollama et renvoie la réponse JSON parsée."""
+    limite_generation = NUM_PREDICT if num_predict is None else max(1, min(num_predict, 3000))
     requete = {
         "model": MODEL,
         "messages": [
@@ -121,7 +127,7 @@ def appeler_llm(system: str, user: str, temperature: float = 0.2) -> dict[str, A
         "options": {
             "temperature": temperature,
             "num_ctx": NUM_CTX,
-            "num_predict": NUM_PREDICT,
+            "num_predict": limite_generation,
         },
     }
     try:
@@ -164,7 +170,12 @@ def appeler_llm(system: str, user: str, temperature: float = 0.2) -> dict[str, A
     if not isinstance(contenu, str):
         raise ValueError("Ollama n'a pas renvoyé un contenu textuel JSON.")
 
-    resultat = json.loads(contenu)
+    try:
+        resultat = json.loads(contenu)
+    except json.JSONDecodeError as erreur:
+        raise ValueError(
+            "Ollama a renvoyé un JSON incomplet. Essaie de réduire le nombre de questions."
+        ) from erreur
     if not isinstance(resultat, dict):
         raise ValueError("La réponse du LLM doit être un objet JSON.")
     return resultat

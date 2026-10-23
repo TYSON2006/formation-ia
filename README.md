@@ -2,7 +2,8 @@
 
 Cette version utilise Ollama en local. Les réponses sont générées sur ton
 ordinateur ; aucune clé API Mistral n'est nécessaire. Une clé Tavily facultative
-active la recherche web et les liens vers les pages réellement trouvées.
+permet une recherche web de secours si les PDF et le tuteur ne suffisent pas ;
+les réponses citent les pages ou liens consultés.
 
 ## Objectif pédagogique
 
@@ -16,7 +17,7 @@ contiennent pas la réponse.
 
 L'application s'appelle **Tyson AI** et son interface affiche sa création par
 Tyson. Le prompt de comportement porte l'identifiant
-`VERSION_PROMPT = "tuteur-pedagogique-v3-by-tyson"` dans `rag.py` : il sert à
+`VERSION_PROMPT = "tuteur-pedagogique-v4-by-tyson"` dans `rag.py` : il sert à
 repérer la version du tuteur et fait partie de la clé du cache. Quand les
 consignes ou la stratégie de recherche changent de façon importante, incrémente
 cette version pour éviter de réutiliser les réponses produites par une ancienne
@@ -27,20 +28,24 @@ le RAG : une recherche sémantique trouve des passages proches par le sens, puis
 un classement BM25 tient compte des termes exacts et diversifie les pages
 sélectionnées. Les comptes sont personnels, tandis que les dossiers et discussions
 restent partagés par les membres du même serveur. Une recherche web facultative fournit au modèle des extraits et
-des URL retournés par Tavily ; le modèle ne fabrique pas les liens.
+des URL retournés par Tavily seulement quand les sources des cours ne répondent
+pas ; le modèle ne fabrique pas les liens.
 
 ## Fonctionnement
 
 1. `rag.py` extrait le texte des PDF, le découpe et sauvegarde les embeddings
    dans `index/chroma/` avec ChromaDB, séparément des bases SQLite.
-2. À chaque question, ChromaDB retrouve des passages pertinents.
-3. `recherche_web.py` peut compléter ces passages avec des résultats web facultatifs.
-4. `llm.py` envoie le contexte à Ollama et valide la réponse JSON.
-5. `main.py` expose les routes de connexion et protège l'API du chat, des PDF,
+2. À chaque question, ChromaDB retrouve des passages pertinents dans les PDF.
+3. Si le tuteur ne trouve pas de réponse étayée et que la recherche web est activée,
+   `recherche_web.py` interroge Tavily puis le tuteur formule une réponse avec ces sources.
+4. Une demande de QCM produit des questions et choix interactifs, avec correction,
+   explications et score dans la discussion.
+5. `llm.py` envoie le contexte à Ollama et valide la réponse JSON.
+6. `main.py` expose les routes de connexion et protège l'API du chat, des PDF,
    des dossiers et des discussions.
-6. `espaces.py` conserve les comptes, les sessions, le journal des réponses, les
+7. `espaces.py` conserve les comptes, les sessions, le journal des réponses, les
    dossiers et les discussions dans SQLite.
-7. L'interface retrouve les conversations enregistrées et conserve leur historique
+8. L'interface retrouve les conversations enregistrées et conserve leur historique
    pour les questions de suivi. L'accueil varie lors du rechargement de la page.
 
 Les passages gardent le nom du PDF et le numéro de page pour afficher les sources.
@@ -51,14 +56,14 @@ propres documents dans `documents/`.
 
 | Fichier ou dossier | Rôle dans le projet |
 | --- | --- |
-| `main.py` | API FastAPI : inscription, connexion, sessions, journal administrateur, `POST /ask`, import de PDF, dossiers et discussions. |
-| `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, les stocke dans ChromaDB, récupère jusqu'à 24 candidats et les reclasse avec recherche sémantique, BM25 et diversité des pages ; prépare les sources et gère le cache des réponses. |
-| `espaces.py` | Enregistre dans SQLite les comptes, sessions sécurisées, résultats des réponses, dossiers communs, discussions, messages et sources. |
-| `recherche_web.py` | Interroge Tavily avec une clé serveur facultative, limite les résultats transmis au modèle et écarte les URL non HTTP(S). |
-| `llm.py` | Envoie les passages à Ollama, démarre automatiquement le service local s'il est arrêté, puis vérifie que le JSON reçu est valide. |
+| `main.py` | API FastAPI : inscription, connexion, sessions, journal administrateur, réponses, recherche web de secours, QCM interactifs, import de PDF, dossiers et discussions. |
+| `rag.py` | Extrait le texte des PDF, les découpe, récupère jusqu'à 24 candidats et les reclasse ; prépare les réponses, les QCM fondés sur les sources et le cache. |
+| `espaces.py` | Enregistre dans SQLite les comptes, sessions sécurisées, réponses, QCM, dossiers communs, discussions, messages et sources. |
+| `recherche_web.py` | Interroge Tavily lors d'une recherche de secours, limite les résultats transmis au modèle et écarte les URL non HTTP(S). |
+| `llm.py` | Envoie les passages à Ollama, démarre automatiquement le service local s'il est arrêté, adapte la limite de génération et vérifie le JSON reçu. |
 | `static/index.html` | Structure de la connexion, du chat, de la barre des dossiers et du journal administrateur. |
 | `static/style.css` | Apparence de la connexion, du chat et du journal, avec une barre latérale adaptée aux téléphones. |
-| `static/app.js` | Connexion/inscription, navigation partagée, envoi des questions et PDF, affichage des sources et du journal administrateur. |
+| `static/app.js` | Connexion/inscription, navigation partagée, envoi des questions et PDF, QCM interactifs avec score, sources et journal administrateur. |
 | `documents/` | PDF locaux à indexer. Les fichiers PDF sont ignorés par Git et ne sont donc pas publiés. |
 | `index/` | Index vectoriel ChromaDB (`chroma/`), cache des réponses et données des discussions, tous locaux et ignorés par Git. |
 | `evaluation/questions.json` | Questions de référence, réponses attendues et pages à retrouver dans le cours d'introduction à l'IA. |
@@ -76,6 +81,13 @@ Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étape
 - `static/index.html`, `static/style.css` et `static/app.js` : champ de saisie du
   chat agrandi, affiché sur deux lignes au repos et extensible jusqu'à 150 px ;
   affichage compact sur les fenêtres de faible hauteur pour agrandir la zone des messages.
+- `rag.py` et `main.py` : Tavily n'est consulté qu'après une réponse sans source
+  fiable dans les cours ; le tuteur répond normalement si aucune source web n'est trouvée.
+- `rag.py`, `llm.py`, `main.py`, `espaces.py`, `static/app.js` et `static/style.css` :
+  génération de QCM structurés jusqu'à huit questions, correction interactive, score,
+  explications, sources et conservation du QCM quand la discussion est rouverte.
+- `llm.py` : budget de génération augmenté pour les QCM et message clair quand Ollama
+  renvoie un JSON incomplet.
 - `llm.py` : si l'API Ollama locale ne répond pas, recherche `ollama.exe`, lance
   `ollama serve` en tâche de fond et attend jusqu'à 30 secondes que l'API soit prête.
   `OLLAMA_START_TIMEOUT` permet d'ajuster cette attente. Le script familial indique
@@ -199,16 +211,16 @@ TAVILY_API_KEY=
 COOKIE_SECURE=false
 ```
 
-Pour activer la recherche web, crée un compte Tavily, récupère ta clé API et
+Pour activer la recherche web de secours, crée un compte Tavily, récupère ta clé API et
 remplace la ligne vide `TAVILY_API_KEY=` dans `.env`. Ne colle jamais cette clé
 dans `static/app.js`, dans GitHub ou dans un message partagé. Redémarre FastAPI
-après avoir modifié `.env`. L'option « Ajouter des sources web vérifiées » est
-alors activée dans le chat ; tu peux la décocher pour une question. Les résultats
-reçus sont présentés sous forme de liens cliquables. Sans clé Tavily, le chatbot
-continue à utiliser ses PDF et Ollama normalement.
-Quand cette option est active, la question (et le contexte de la dernière question
-pour une relance courte) sont envoyés à Tavily pour effectuer la recherche ; le
-contenu des PDF n'est pas envoyé à ce service.
+après avoir modifié `.env`. L'option « Si les cours ne répondent pas, chercher sur
+le web » est alors activée dans le chat ; tu peux la décocher. Tyson AI consulte
+d'abord les PDF, puis Tavily seulement si les sources ne permettent pas de répondre.
+Les résultats reçus sont présentés sous forme de liens cliquables. Sans clé Tavily,
+le chatbot conserve sa réponse normale : il indique clairement quand il ne trouve pas
+l'information. La question (et le contexte de la dernière question pour une relance
+courte) peuvent être envoyés à Tavily ; le contenu des PDF ne l'est jamais.
 
 Tavily annonce actuellement 1 000 crédits API gratuits par mois sans carte
 bancaire. Consulte [la page officielle des tarifs Tavily](https://www.tavily.com/pricing)
@@ -303,6 +315,12 @@ contexte, pose une question de suivi, par exemple « Peux-tu expliquer cela plus
 simplement ? ». Le bouton « Nouvelle discussion » crée une conversation partagée
 qui reste dans la liste après un rechargement.
 
+Pour créer un exercice, écris par exemple « Génère un QCM de 5 questions sur
+Python ». Le tuteur utilise d'abord les cours indexés. Le QCM apparaît dans la
+discussion avec quatre choix par question ; sélectionne tes réponses et clique sur
+« Corriger le QCM » pour obtenir ton score et les explications. Tu peux recommencer
+l'exercice ou rouvrir la discussion plus tard.
+
 La première réponse après le démarrage peut prendre plus de temps : Ollama doit
 charger son modèle. Pendant la recherche, l'interface affiche une animation.
 Après avoir ajouté un PDF, attends le message « Document prêt », puis pose une
@@ -365,8 +383,8 @@ un réseau de confiance et ne l'expose pas directement à Internet.
 4. L'espace étant commun au serveur, les mêmes dossiers et discussions seront
    visibles aux autres utilisateurs lorsqu'ils accéderont à cette application.
 5. Pour la recherche web, configure `TAVILY_API_KEY` dans `.env`, redémarre le
-   serveur et vérifie que la case « Ajouter des sources web » est active.
-   Pose une question factuelle, puis ouvre un lien affiché sous la réponse.
+   serveur et vérifie que la case de recherche web de secours est active.
+   Pose une question absente de tes cours, puis ouvre un lien web sous la réponse.
 
 ## Créer les comptes et vérifier le journal
 
@@ -423,8 +441,10 @@ La réponse contient une explication et les références aux PDF, par exemple :
 }
 ```
 
-Si les extraits ne contiennent pas la réponse, le chatbot répond qu'il ne trouve
-pas l'information et renvoie `"sources": []`.
+Si les extraits ne contiennent pas la réponse, le chatbot peut utiliser Tavily
+lorsque la case de recherche web de secours est activée. Si Tavily ne trouve pas de
+source utile (ou si la case est décochée), le chatbot indique qu'il ne trouve pas
+l'information et renvoie `"sources": []`.
 
 ## Dépannage Windows
 
@@ -432,5 +452,7 @@ pas l'information et renvoie `"sources": []`.
   l'application Ollama manuellement et vérifie `http://127.0.0.1:11434/api/tags`.
 - Si Ollama ne trouve pas `llama3.2:3b`, télécharge-le avec la commande indiquée
   dans la section Préparation.
+- Si un QCM échoue parce qu'Ollama renvoie un JSON incomplet, demande moins de
+  questions ; les QCM sont générés avec un budget plus grand que les réponses ordinaires.
 - Si ChromaDB signale `DLL load failed while importing chromadb_rust_bindings`,
   installe le Microsoft Visual C++ Redistributable x64, puis redémarre VS Code.

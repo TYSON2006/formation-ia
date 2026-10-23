@@ -135,7 +135,7 @@ async function afficherApplication(utilisateur) {
     webSearchToggle.disabled = !configuration.recherche_web_disponible;
     webSearchToggle.checked = configuration.recherche_web_disponible;
     webSearchStatus.textContent = configuration.recherche_web_disponible
-      ? "Tavily actif · une recherche par question"
+      ? "Tavily actif · recherche si les cours ne suffisent pas"
       : "Clé TAVILY_API_KEY requise dans .env";
   } catch {
     webSearchStatus.textContent = "Recherche web indisponible";
@@ -288,7 +288,9 @@ async function ouvrirDiscussion(identifiant) {
       messages.append(welcome);
     } else {
       for (const message of discussion.messages) {
-        ajouterMessage(message.role, message.content, message.sources ?? []);
+        ajouterMessage(message.role, message.content, message.sources ?? [], {
+          quiz: message.quiz,
+        });
       }
     }
     afficherEspace();
@@ -299,6 +301,113 @@ async function ouvrirDiscussion(identifiant) {
     ajouterMessage("assistant", erreur.message, [], { error: true });
     afficherStatut("Impossible d’ouvrir la discussion", "error");
   }
+}
+
+let numeroQuiz = 0;
+
+function ajouterQuiz(main, quiz) {
+  if (!quiz || !Array.isArray(quiz.questions) || quiz.questions.length === 0) return;
+
+  const carte = document.createElement("section");
+  carte.className = "quiz-card";
+  const titre = document.createElement("h3");
+  titre.className = "quiz-title";
+  titre.textContent = quiz.titre || "QCM";
+  const consigne = document.createElement("p");
+  consigne.className = "quiz-instruction";
+  consigne.textContent = "Choisis une réponse pour chaque question.";
+  carte.append(titre, consigne);
+
+  const numero = ++numeroQuiz;
+  const lignesQuestions = quiz.questions.map((question, index) => {
+    const bloc = document.createElement("fieldset");
+    bloc.className = "quiz-question";
+    const intitule = document.createElement("legend");
+    intitule.textContent = `${index + 1}. ${question.question}`;
+    bloc.append(intitule);
+
+    const lignesChoix = (question.choix || []).map((choix, choixIndex) => {
+      const label = document.createElement("label");
+      label.className = "quiz-choice";
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = `quiz-${numero}-question-${index}`;
+      input.value = String(choixIndex);
+      const texte = document.createElement("span");
+      texte.textContent = choix;
+      label.append(input, texte);
+      bloc.append(label);
+      return { label, input };
+    });
+    const explication = document.createElement("p");
+    explication.className = "quiz-explanation";
+    explication.hidden = true;
+    bloc.append(explication);
+    carte.append(bloc);
+    return { bloc, lignesChoix, explication, question };
+  });
+
+  const corriger = document.createElement("button");
+  corriger.className = "quiz-submit";
+  corriger.type = "button";
+  corriger.textContent = "Corriger le QCM";
+  const resultat = document.createElement("p");
+  resultat.className = "quiz-score";
+  resultat.setAttribute("role", "status");
+  carte.append(corriger, resultat);
+
+  let corrige = false;
+  corriger.addEventListener("click", () => {
+    if (corrige) {
+      for (const ligne of lignesQuestions) {
+        ligne.bloc.classList.remove("is-correct", "is-incorrect");
+        ligne.explication.hidden = true;
+        ligne.explication.textContent = "";
+        for (const { label, input } of ligne.lignesChoix) {
+          label.classList.remove("is-correct", "is-incorrect");
+          input.checked = false;
+          input.disabled = false;
+        }
+      }
+      resultat.textContent = "";
+      resultat.classList.remove("is-incomplete");
+      corrige = false;
+      corriger.textContent = "Corriger le QCM";
+      return;
+    }
+
+    const selections = lignesQuestions.map((ligne) =>
+      ligne.lignesChoix.findIndex(({ input }) => input.checked)
+    );
+    if (selections.some((selection) => selection < 0)) {
+      resultat.textContent = "Réponds à toutes les questions avant de corriger.";
+      resultat.classList.add("is-incomplete");
+      return;
+    }
+
+    let score = 0;
+    lignesQuestions.forEach((ligne, index) => {
+      const bonneReponse = ligne.question.bonne_reponse;
+      const selection = selections[index];
+      if (selection === bonneReponse) score += 1;
+      ligne.lignesChoix.forEach(({ label, input }, choixIndex) => {
+        input.disabled = true;
+        if (choixIndex === bonneReponse) label.classList.add("is-correct");
+        if (choixIndex === selection && choixIndex !== bonneReponse) {
+          label.classList.add("is-incorrect");
+        }
+      });
+      ligne.explication.textContent = `Bonne réponse : ${ligne.question.choix[bonneReponse]}. ${ligne.question.explication}`;
+      ligne.explication.hidden = false;
+    });
+
+    resultat.textContent = `Ton score : ${score} / ${lignesQuestions.length}`;
+    resultat.classList.remove("is-incomplete");
+    corrige = true;
+    corriger.textContent = "Recommencer le QCM";
+  });
+
+  main.append(carte);
 }
 
 function ajouterMessage(role, texte, sources = [], options = {}) {
@@ -333,6 +442,8 @@ function ajouterMessage(role, texte, sources = [], options = {}) {
   }
 
   main.append(meta, content);
+
+  if (role === "assistant" && options.quiz) ajouterQuiz(main, options.quiz);
 
   if (sources.length > 0) {
     const sourceList = document.createElement("div");
@@ -401,7 +512,9 @@ async function envoyerQuestion(question) {
     });
 
     messageAttente.remove();
-    ajouterMessage("assistant", resultat.reponse, resultat.sources ?? []);
+    ajouterMessage("assistant", resultat.reponse, resultat.sources ?? [], {
+      quiz: resultat.quiz,
+    });
     historique.push(
       { role: "user", content: texteQuestion },
       { role: "assistant", content: resultat.reponse },

@@ -50,6 +50,7 @@ def initialiser() -> None:
                 role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
                 contenu TEXT NOT NULL,
                 sources TEXT NOT NULL DEFAULT '[]',
+                quiz TEXT,
                 cree_le REAL NOT NULL
             );
             CREATE TABLE IF NOT EXISTS utilisateurs (
@@ -86,6 +87,11 @@ def initialiser() -> None:
                 ON messages(discussion_id, id);
             """
         )
+        colonnes_messages = {
+            colonne["name"] for colonne in connexion.execute("PRAGMA table_info(messages)")
+        }
+        if "quiz" not in colonnes_messages:
+            connexion.execute("ALTER TABLE messages ADD COLUMN quiz TEXT")
 
 
 def creer_utilisateur(nom_utilisateur: str, sel: str, empreinte: str) -> dict[str, Any]:
@@ -228,7 +234,7 @@ def obtenir_discussion(identifiant: str) -> dict[str, Any] | None:
             return None
         resultat = dict(ligne)
         messages = connexion.execute(
-            "SELECT role, contenu, sources, cree_le FROM messages "
+            "SELECT role, contenu, sources, quiz, cree_le FROM messages "
             "WHERE discussion_id = ? ORDER BY id",
             (identifiant,),
         ).fetchall()
@@ -237,6 +243,7 @@ def obtenir_discussion(identifiant: str) -> dict[str, Any] | None:
             "role": message["role"],
             "content": message["contenu"],
             "sources": json.loads(message["sources"]),
+            "quiz": json.loads(message["quiz"]) if message["quiz"] else None,
             "created_at": message["cree_le"],
         }
         for message in messages
@@ -304,7 +311,11 @@ def historique(identifiant: str, limite: int = 6) -> list[dict[str, str]] | None
 
 
 def enregistrer_tour(
-    identifiant: str, question: str, reponse: str, sources: list[dict[str, Any]]
+    identifiant: str,
+    question: str,
+    reponse: str,
+    sources: list[dict[str, Any]],
+    quiz: dict[str, Any] | None = None,
 ) -> bool:
     maintenant = time.time()
     with connecter() as connexion:
@@ -324,12 +335,14 @@ def enregistrer_tour(
                 "UPDATE discussions SET titre = ? WHERE id = ?", (titre, identifiant)
             )
         connexion.executemany(
-            "INSERT INTO messages (discussion_id, role, contenu, sources, cree_le) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO messages (discussion_id, role, contenu, sources, quiz, cree_le) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             (
-                (identifiant, "user", question, "[]", maintenant),
+                (identifiant, "user", question, "[]", None, maintenant),
                 (identifiant, "assistant", reponse,
-                 json.dumps(sources, ensure_ascii=False), maintenant),
+                 json.dumps(sources, ensure_ascii=False),
+                 json.dumps(quiz, ensure_ascii=False) if quiz else None,
+                 maintenant),
             ),
         )
         connexion.execute(
