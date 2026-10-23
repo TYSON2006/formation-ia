@@ -1,9 +1,15 @@
 """Appelle le modèle local Ollama et valide sa réponse JSON."""
 
 import json
+import logging
 import os
+import shutil
+import subprocess
+import threading
+import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import requests
 from dotenv import load_dotenv
@@ -18,35 +24,127 @@ TIMEOUT = float(os.getenv("LLM_TIMEOUT", "180"))
 KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
 NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "160"))
+OLLAMA_START_TIMEOUT = float(os.getenv("OLLAMA_START_TIMEOUT", "30"))
+
+LOGGER = logging.getLogger(__name__)
+_OLLAMA_START_LOCK = threading.Lock()
+
+
+def _url_api_tags() -> str | None:
+    """Renvoie /api/tags si LLM_URL désigne Ollama local sur le port standard."""
+    morceaux = urlsplit(URL)
+    if morceaux.scheme != "http":
+        return None
+    if morceaux.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        return None
+    if morceaux.port != 11434:
+        return None
+    return f"{morceaux.scheme}://{morceaux.netloc}/api/tags"
+
+
+def _trouver_ollama() -> str | None:
+    """Trouve l'exécutable Ollama dans le PATH ou son emplacement Windows courant."""
+    executable = shutil.which("ollama")
+    if executable:
+        return executable
+
+    local_app_data = os.getenv("LOCALAPPDATA")
+    if local_app_data:
+        candidat = Path(local_app_data) / "Programs" / "Ollama" / "ollama.exe"
+        if candidat.is_file():
+            return str(candidat)
+    return None
+
+
+def _demarrer_ollama_local(url_tags: str) -> None:
+    """Démarre Ollama s'il est installé et attend que son API réponde."""
+    with _OLLAMA_START_LOCK:
+        try:
+            disponible = requests.get(url_tags, timeout=2)
+            if disponible.ok:
+                return
+        except requests.RequestException:
+            pass
+
+        executable = _trouver_ollama()
+        if not executable:
+            raise RuntimeError(
+                "Ollama ne répond pas et son exécutable est introuvable. "
+                "Démarre l'application Ollama ou réinstalle-la."
+            )
+
+        LOGGER.info("Ollama ne répond pas ; démarrage automatique du service local.")
+        try:
+            options: dict[str, Any] = {
+                "stdin": subprocess.DEVNULL,
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+            }
+            if os.name == "nt":
+                options["creationflags"] = subprocess.CREATE_NO_WINDOW
+            subprocess.Popen([executable, "serve"], **options)
+        except OSError as erreur:
+            raise RuntimeError(
+                "Ollama ne répond pas et son démarrage automatique a échoué. "
+                "Démarre l'application Ollama manuellement."
+            ) from erreur
+
+        limite = time.monotonic() + OLLAMA_START_TIMEOUT
+        while time.monotonic() < limite:
+            try:
+                disponible = requests.get(url_tags, timeout=2)
+                if disponible.ok:
+                    LOGGER.info("Le service Ollama est prêt.")
+                    return
+            except requests.RequestException:
+                pass
+            time.sleep(1)
+
+        raise RuntimeError(
+            f"Ollama n'a pas répondu après son démarrage automatique "
+            f"({OLLAMA_START_TIMEOUT:g} secondes). Vérifie qu'il est installé "
+            "et réessaie."
+        )
 
 
 def appeler_llm(system: str, user: str, temperature: float = 0.2) -> dict[str, Any]:
     """Envoie deux messages à Ollama et renvoie la réponse JSON parsée."""
+    requete = {
+        "model": MODEL,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "stream": False,
+        "format": "json",
+        "keep_alive": KEEP_ALIVE,
+        "options": {
+            "temperature": temperature,
+            "num_ctx": NUM_CTX,
+            "num_predict": NUM_PREDICT,
+        },
+    }
     try:
         reponse = requests.post(
             URL,
-            json={
-                "model": MODEL,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-                "stream": False,
-                "format": "json",
-                "keep_alive": KEEP_ALIVE,
-                "options": {
-                    "temperature": temperature,
-                    "num_ctx": NUM_CTX,
-                    "num_predict": NUM_PREDICT,
-                },
-            },
+            json=requete,
             timeout=TIMEOUT,
         )
     except requests.ConnectionError as erreur:
-        raise RuntimeError(
-            "Ollama ne répond pas sur le port local 11434. "
-            "Vérifie que l'application Ollama est démarrée."
-        ) from erreur
+        url_tags = _url_api_tags()
+        if not url_tags:
+            raise RuntimeError(
+                "Ollama ne répond pas à l'adresse configurée dans LLM_URL. "
+                "Vérifie que le service est démarré."
+            ) from erreur
+
+        _demarrer_ollama_local(url_tags)
+        try:
+            reponse = requests.post(URL, json=requete, timeout=TIMEOUT)
+        except requests.ConnectionError as nouvelle_erreur:
+            raise RuntimeError(
+                "Ollama a été démarré, mais ne répond toujours pas sur le port local 11434."
+            ) from nouvelle_erreur
 
     if not reponse.ok:
         try:

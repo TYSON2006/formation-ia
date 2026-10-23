@@ -51,7 +51,7 @@ try {
     Write-Host "Ollama est joignable sur cet ordinateur." -ForegroundColor Green
 }
 catch {
-    Write-Warning "Ollama ne répond pas sur le port 11434. Démarre Ollama avant de poser des questions."
+    Write-Warning "Ollama n'est pas encore joignable. Le chatbot tentera de démarrer Ollama automatiquement à la première question."
 }
 
 Write-Host ""

@@ -55,7 +55,7 @@ propres documents dans `documents/`.
 | `rag.py` | Extrait le texte des PDF, le découpe en passages de 350 mots avec 50 mots de chevauchement, les stocke dans ChromaDB, récupère jusqu'à 24 candidats et les reclasse avec recherche sémantique, BM25 et diversité des pages ; prépare les sources et gère le cache des réponses. |
 | `espaces.py` | Enregistre dans SQLite les comptes, sessions sécurisées, résultats des réponses, dossiers communs, discussions, messages et sources. |
 | `recherche_web.py` | Interroge Tavily avec une clé serveur facultative, limite les résultats transmis au modèle et écarte les URL non HTTP(S). |
-| `llm.py` | Envoie les passages à Ollama, demande une réponse JSON concise et vérifie que le JSON reçu est valide. |
+| `llm.py` | Envoie les passages à Ollama, démarre automatiquement le service local s'il est arrêté, puis vérifie que le JSON reçu est valide. |
 | `static/index.html` | Structure de la connexion, du chat, de la barre des dossiers et du journal administrateur. |
 | `static/style.css` | Apparence de la connexion, du chat et du journal, avec une barre latérale adaptée aux téléphones. |
 | `static/app.js` | Connexion/inscription, navigation partagée, envoi des questions et PDF, affichage des sources et du journal administrateur. |
@@ -73,6 +73,10 @@ propres documents dans `documents/`.
 
 Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étapes :
 
+- `llm.py` : si l'API Ollama locale ne répond pas, recherche `ollama.exe`, lance
+  `ollama serve` en tâche de fond et attend jusqu'à 30 secondes que l'API soit prête.
+  `OLLAMA_START_TIMEOUT` permet d'ajuster cette attente. Le script familial indique
+  maintenant que le démarrage sera tenté à la première question.
 - `main.py` : ajout de `POST /documents`. Cette route accepte un PDF, vérifie son
   extension et son contenu, limite sa taille à 20 Mo, refuse une copie exacte déjà
   importée et ajoute un suffixe si un PDF différent porte le même nom.
@@ -161,9 +165,10 @@ fichier `.env` est local et ne doit pas être envoyé sur GitHub.
 
 ## Préparation
 
-Installe et démarre l'application Ollama pour Windows. Le modèle configuré est
-`llama3.2:3b`, qui est déjà installé dans cette configuration. Si tu dois le
-télécharger de nouveau dans PowerShell, utilise :
+Installe Ollama et vérifie que le modèle `llama3.2:3b` est disponible. Si l'API
+locale n'est pas démarrée, `llm.py` tentera de lancer Ollama automatiquement lors
+de la première question et attendra jusqu'à 30 secondes. Le modèle est déjà installé
+sur cet ordinateur. Si tu dois le télécharger de nouveau dans PowerShell, utilise :
 
 ```powershell
 & "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull llama3.2:3b
@@ -182,6 +187,7 @@ Le fichier `.env` contient les réglages locaux :
 LLM_URL=http://127.0.0.1:11434/api/chat
 LLM_MODEL=llama3.2:3b
 LLM_TIMEOUT=180
+OLLAMA_START_TIMEOUT=30
 OLLAMA_KEEP_ALIVE=30m
 OLLAMA_NUM_CTX=4096
 OLLAMA_NUM_PREDICT=160
@@ -308,8 +314,7 @@ ordinateur ; les autres appareils utilisent seulement le navigateur. En mode
 local seul, aucune clé API n'est requise. La recherche web facultative utilise le
 quota Tavily configuré sur l'ordinateur hôte.
 
-1. Démarre l'application Ollama sur ton ordinateur.
-2. Ouvre PowerShell dans le dossier `formation-ia` et lance :
+1. Ouvre PowerShell dans le dossier `formation-ia` et lance :
 
    ```powershell
    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -318,11 +323,11 @@ quota Tavily configuré sur l'ordinateur hôte.
 
    Ce réglage de stratégie ne vaut que pour cette fenêtre PowerShell.
 
-3. Le script affiche une adresse locale, par exemple
+2. Le script affiche une adresse locale, par exemple
    `http://192.168.1.7:8000/?v=tyson-ai-v1`. Ouvre cette adresse sur l'ordinateur
    hôte et transmets-la aux membres de la famille, qui doivent être sur le même
    Wi-Fi.
-4. Si Windows affiche une demande de pare-feu, autorise Python sur les réseaux
+3. Si Windows affiche une demande de pare-feu, autorise Python sur les réseaux
    privés. Laisse la fenêtre PowerShell ouverte pendant l'essai ; `Ctrl+C` arrête
    le serveur.
 
@@ -420,8 +425,8 @@ pas l'information et renvoie `"sources": []`.
 
 ## Dépannage Windows
 
-- Si `llm.py` dit qu'Ollama ne répond pas, démarre l'application Ollama et vérifie
-  `http://127.0.0.1:11434/api/tags`.
+- Si Ollama ne répond toujours pas après le démarrage automatique, démarre
+  l'application Ollama manuellement et vérifie `http://127.0.0.1:11434/api/tags`.
 - Si Ollama ne trouve pas `llama3.2:3b`, télécharge-le avec la commande indiquée
   dans la section Préparation.
 - Si ChromaDB signale `DLL load failed while importing chromadb_rust_bindings`,
