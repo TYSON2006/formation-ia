@@ -28,6 +28,7 @@ from llm import MODEL, appeler_llm
 DOSSIER_DOCUMENTS = DOSSIER / "documents"
 DOSSIER_INDEX = DOSSIER / "index"
 DOSSIER_CHROMA = DOSSIER_INDEX / "chroma"
+DOSSIER_CACHE_OCR = DOSSIER_INDEX / "ocr"
 MODELE_EMBEDDING = "paraphrase-multilingual-MiniLM-L12-v2"
 TAILLE_CHUNK = 350
 CHEVAUCHEMENT = 50
@@ -168,6 +169,48 @@ def decouper(texte: str, taille: int = TAILLE_CHUNK, chevauchement: int = CHEVAU
             yield morceau
 
 
+def empreinte_fichier(chemin: Path) -> str:
+    """Calcule l'empreinte SHA-256 d'un PDF sans le charger en entier en mémoire."""
+    empreinte = hashlib.sha256()
+    with chemin.open("rb") as fichier:
+        for bloc in iter(lambda: fichier.read(1024 * 1024), b""):
+            empreinte.update(bloc)
+    return empreinte.hexdigest()
+
+
+def charger_cache_ocr(chemin: Path, source: str) -> dict[int, str]:
+    """Charge le texte OCR local s'il correspond exactement à ce PDF."""
+    cle_source = hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
+    chemin_cache = DOSSIER_CACHE_OCR / f"{cle_source}.json"
+    if not chemin_cache.is_file():
+        return {}
+
+    try:
+        donnees = json.loads(chemin_cache.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as erreur:
+        LOGGER.warning("Cache OCR illisible pour %s (%s).", source, type(erreur).__name__)
+        return {}
+
+    if not isinstance(donnees, dict) or donnees.get("source") != source:
+        return {}
+    if donnees.get("sha256_pdf") != empreinte_fichier(chemin):
+        LOGGER.warning("Cache OCR ignoré car le PDF a changé : %s", source)
+        return {}
+
+    pages = donnees.get("pages")
+    if not isinstance(pages, dict):
+        return {}
+    textes: dict[int, str] = {}
+    for numero_page, texte in pages.items():
+        try:
+            numero = int(numero_page)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(texte, str) and texte.strip():
+            textes[numero] = texte
+    return textes
+
+
 def tokeniser_recherche(texte: str) -> list[str]:
     """Prépare les mots pour comparer les termes exacts sans distinguer les accents."""
     decomposer = unicodedata.normalize("NFKD", texte.casefold())
@@ -261,10 +304,13 @@ def indexer_pdf(chemin: Path) -> dict[str, Any]:
     metadonnees: list[dict[str, Any]] = []
     pages_vides = 0
     empreinte_source = hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
+    textes_ocr = charger_cache_ocr(chemin, source)
 
     lecteur = PdfReader(str(chemin))
     for numero_page, page in enumerate(lecteur.pages, start=1):
         texte = page.extract_text() or ""
+        if not texte.strip():
+            texte = textes_ocr.get(numero_page, "")
         if not texte.strip():
             pages_vides += 1
             continue

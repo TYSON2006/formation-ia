@@ -227,7 +227,11 @@ ce dossier :
 ```
 
 Les PDF doivent être dans `documents/`. Les PDF scannés sans texte sélectionnable
-ne seront pas indexés correctement. Le modèle d'embedding multilingue est distinct
+ont besoin d'un cache OCR en français dans `index/ocr/`. `rag.py` vérifie que le
+cache correspond toujours au PDF, puis indexe son texte avec le nom du document
+et les numéros de page. Sans cache, les pages scannées restent ignorées. Les PDF
+et caches OCR sont des données locales ignorées par Git. Le modèle d'embedding
+multilingue est distinct
 du modèle Ollama. Il est déjà en cache après l'indexation précédente ;
 `HF_HUB_OFFLINE=1` évite les vérifications réseau répétées. Sur un autre ordinateur
 ou si le modèle n'est pas en cache, mets temporairement `HF_HUB_OFFLINE=0`, lance
