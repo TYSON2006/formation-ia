@@ -422,6 +422,7 @@ def ask(body: Question, utilisateur: dict = Depends(utilisateur_connecte)) -> di
     debut = time.perf_counter()
     sources_pdf = 0
     sources_web_comptees = 0
+    demande_qcm = False
 
     def journaliser(statut: str, code_erreur: str | None = None) -> None:
         try:
@@ -509,9 +510,15 @@ def ask(body: Question, utilisateur: dict = Depends(utilisateur_connecte)) -> di
         raise
     except requests.Timeout as erreur:
         journaliser("echec", "delai_depasse")
+        detail = (
+            "Ollama met trop de temps à créer le QCM. Réessaie avec moins de questions, "
+            "ou augmente LLM_QCM_TIMEOUT dans .env."
+            if demande_qcm
+            else "Ollama met trop de temps à répondre. Le premier chargement du modèle peut être plus long."
+        )
         raise HTTPException(
             status_code=504,
-            detail="Ollama met trop de temps à répondre. Le premier chargement peut être plus long.",
+            detail=detail,
         ) from erreur
     except requests.HTTPError as erreur:
         code = erreur.response.status_code if erreur.response is not None else 502

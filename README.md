@@ -202,6 +202,7 @@ Le fichier `.env` contient les réglages locaux :
 LLM_URL=http://127.0.0.1:11434/api/chat
 LLM_MODEL=llama3.2:3b
 LLM_TIMEOUT=180
+LLM_QCM_TIMEOUT=300
 OLLAMA_START_TIMEOUT=30
 OLLAMA_KEEP_ALIVE=30m
 OLLAMA_NUM_CTX=4096
@@ -210,6 +211,12 @@ HF_HUB_OFFLINE=1
 TAVILY_API_KEY=
 COOKIE_SECURE=false
 ```
+
+`LLM_TIMEOUT` règle le délai des réponses ordinaires. `LLM_QCM_TIMEOUT` règle
+celui des QCM ; sa valeur par défaut est de 300 secondes pour laisser au modèle
+local le temps de générer toutes les questions. Si un QCM dépasse encore ce délai,
+tu peux augmenter cette variable dans `.env`, puis redémarrer FastAPI. Il n'est pas
+nécessaire de l'ajouter à ton `.env` existant pour bénéficier de la valeur par défaut.
 
 Pour activer la recherche web de secours, crée un compte Tavily, récupère ta clé API et
 remplace la ligne vide `TAVILY_API_KEY=` dans `.env`. Ne colle jamais cette clé
@@ -227,9 +234,9 @@ bancaire. Consulte [la page officielle des tarifs Tavily](https://www.tavily.com
 pour vérifier le quota et les conditions au moment de l'inscription.
 
 Ollama garde le modèle chargé pendant 30 minutes après une réponse. Cela peut
-accélérer la première question après une courte pause, en utilisant la mémoire de
-l'ordinateur pendant ce temps. La génération est limitée à 160 tokens et les
-réponses demandées sont courtes.
+accélérer les questions suivantes, en utilisant la mémoire de l'ordinateur pendant
+ce temps. Les réponses ordinaires sont limitées à 160 tokens ; les QCM utilisent
+une limite plus élevée pour produire leurs questions, choix et explications.
 
 ## Indexer les documents
 

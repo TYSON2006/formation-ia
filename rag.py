@@ -22,7 +22,7 @@ import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from pypdf import PdfReader
 
-from llm import MODEL, NUM_PREDICT, appeler_llm
+from llm import MODEL, NUM_PREDICT, QCM_TIMEOUT, appeler_llm
 
 
 DOSSIER_DOCUMENTS = DOSSIER / "documents"
@@ -725,6 +725,7 @@ bonne_reponse est l'indice du choix correct, de 0 à 3. Ne révèle pas la bonne
                 prompt_utilisateur,
                 temperature=0.1,
                 num_predict=budget_generation,
+                timeout=QCM_TIMEOUT,
             )
         except ValueError as erreur:
             if "JSON incomplet" not in str(erreur):
@@ -737,6 +738,7 @@ bonne_reponse est l'indice du choix correct, de 0 à 3. Ne révèle pas la bonne
                 prompt_utilisateur,
                 temperature=0.1,
                 num_predict=min(3000, budget_generation + 800),
+                timeout=QCM_TIMEOUT,
             )
     finally:
         temps_generation = time.perf_counter() - debut_generation

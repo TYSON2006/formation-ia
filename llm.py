@@ -21,6 +21,7 @@ load_dotenv(DOSSIER_PROJET / ".env")
 URL = os.getenv("LLM_URL", "http://127.0.0.1:11434/api/chat")
 MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 TIMEOUT = float(os.getenv("LLM_TIMEOUT", "180"))
+QCM_TIMEOUT = float(os.getenv("LLM_QCM_TIMEOUT", "300"))
 KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "30m")
 NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
 NUM_PREDICT = int(os.getenv("OLLAMA_NUM_PREDICT", "160"))
@@ -112,9 +113,11 @@ def appeler_llm(
     user: str,
     temperature: float = 0.2,
     num_predict: int | None = None,
+    timeout: float | None = None,
 ) -> dict[str, Any]:
     """Envoie deux messages à Ollama et renvoie la réponse JSON parsée."""
     limite_generation = NUM_PREDICT if num_predict is None else max(1, min(num_predict, 3000))
+    delai_requete = TIMEOUT if timeout is None else max(1.0, timeout)
     requete = {
         "model": MODEL,
         "messages": [
@@ -134,7 +137,7 @@ def appeler_llm(
         reponse = requests.post(
             URL,
             json=requete,
-            timeout=TIMEOUT,
+            timeout=delai_requete,
         )
     except requests.ConnectionError as erreur:
         url_tags = _url_api_tags()
@@ -146,7 +149,7 @@ def appeler_llm(
 
         _demarrer_ollama_local(url_tags)
         try:
-            reponse = requests.post(URL, json=requete, timeout=TIMEOUT)
+            reponse = requests.post(URL, json=requete, timeout=delai_requete)
         except requests.ConnectionError as nouvelle_erreur:
             raise RuntimeError(
                 "Ollama a été démarré, mais ne répond toujours pas sur le port local 11434."
