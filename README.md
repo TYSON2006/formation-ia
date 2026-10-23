@@ -73,6 +73,8 @@ propres documents dans `documents/`.
 
 Les fichiers suivants ont été ajoutés ou modifiés pour les dernières étapes :
 
+- `static/index.html`, `static/style.css` et `static/app.js` : champ de saisie du
+  chat agrandi, affiché sur deux lignes au repos et extensible jusqu'à 150 px.
 - `llm.py` : si l'API Ollama locale ne répond pas, recherche `ollama.exe`, lance
   `ollama serve` en tâche de fond et attend jusqu'à 30 secondes que l'API soit prête.
   `OLLAMA_START_TIMEOUT` permet d'ajuster cette attente. Le script familial indique

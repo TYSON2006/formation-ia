@@ -473,7 +473,7 @@ pdfInput.addEventListener("change", () => {
 
 questionField.addEventListener("input", () => {
   questionField.style.height = "auto";
-  questionField.style.height = `${Math.min(questionField.scrollHeight, 130)}px`;
+  questionField.style.height = `${Math.min(questionField.scrollHeight, 150)}px`;
   mettreAJourBoutons();
 });
 
